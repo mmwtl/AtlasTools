@@ -15,7 +15,6 @@
         <package android:name="com.mmwtl.atlasmediaapi" />
         <package android:name="com.mmwtl.atlasdim" />
         <package android:name="com.mmwtl.atlasterminal" />
-        <package android:name="com.mmwtl.gibcompanion" />
         <package android:name="com.salat.gbinder" />
         <package android:name="com.salat.gsplit" />
         <package android:name="com.andrerinas.headunitrevived" />

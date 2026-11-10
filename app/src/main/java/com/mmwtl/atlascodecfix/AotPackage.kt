@@ -29,7 +29,6 @@ object AotCatalog {
         AotPackage("com.mmwtl.atlasmediaapi", "Atlas Media API"),
         AotPackage("com.mmwtl.atlasdim", "Atlas Dim"),
         AotPackage("com.mmwtl.atlasterminal", "Atlas Terminal"),
-        AotPackage("com.mmwtl.gibcompanion", "GIB Companion"),
         AotPackage("com.salat.gbinder", "GInputBridge (GIB)"),
         AotPackage("com.salat.gsplit", "GSplit"),
         AotPackage("com.andrerinas.headunitrevived", "Open Headunit"),

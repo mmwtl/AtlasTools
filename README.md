@@ -156,7 +156,6 @@ Bind mount существуют только до перезагрузки. Чт
 | Atlas Media API | `com.mmwtl.atlasmediaapi` |
 | Atlas Dim | `com.mmwtl.atlasdim` |
 | Atlas Terminal | `com.mmwtl.atlasterminal` |
-| GIB Companion | `com.mmwtl.gibcompanion` |
 | GInputBridge (GIB) | `com.salat.gbinder` |
 | GSplit | `com.salat.gsplit` |
 | Open Headunit | `com.andrerinas.headunitrevived` |
