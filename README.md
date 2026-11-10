@@ -161,6 +161,13 @@ Bind mount существуют только до перезагрузки. Чт
 | GSplit | `com.salat.gsplit` |
 | Open Headunit | `com.andrerinas.headunitrevived` |
 | Open Headunit Geely | `com.andrerinas.headunitrevived.geely` |
+| GMediaProxy (GMP) | `com.geely.online.service` |
+| GMediaHud (GMH) | `com.salat.gmediahud` |
+| Atlas Tools | `com.mmwtl.atlascodecfix` |
+
+Atlas Tools стоит в списке последним: при пакетной компиляции он обрабатывается после всех
+остальных приложений. Компиляция не останавливает запущенный процесс, новый код используется со
+следующего запуска.
 
 Состояние читается через `dumpsys package dexopt <пакет>`: приложение считается скомпилированным,
 когда все основные dex-файлы имеют фильтр `speed` (или `everything`). Компиляция выполняется

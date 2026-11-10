@@ -16,8 +16,9 @@ data class AotPackage(
 
 object AotCatalog {
     /**
-     * Fixed list of Atlas and companion applications. AtlasTools itself is intentionally absent:
-     * recompiling the running tool is not useful and only adds risk to its own process.
+     * Fixed list of Atlas and companion applications. AtlasTools itself stays last, so a batch
+     * finishes every other app before touching the running tool. `cmd package compile` does not
+     * stop the running process; the new code is used from its next start.
      */
     val PACKAGES: List<AotPackage> = listOf(
         AotPackage("com.geely.atlaslauncher", "Atlas Launcher"),
@@ -32,7 +33,10 @@ object AotCatalog {
         AotPackage("com.salat.gbinder", "GInputBridge (GIB)"),
         AotPackage("com.salat.gsplit", "GSplit"),
         AotPackage("com.andrerinas.headunitrevived", "Open Headunit"),
-        AotPackage("com.andrerinas.headunitrevived.geely", "Open Headunit Geely")
+        AotPackage("com.andrerinas.headunitrevived.geely", "Open Headunit Geely"),
+        AotPackage("com.geely.online.service", "GMediaProxy (GMP)"),
+        AotPackage("com.salat.gmediahud", "GMediaHud (GMH)"),
+        AotPackage(BuildConfig.APPLICATION_ID, "Atlas Tools")
     )
 }
 

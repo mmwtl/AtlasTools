@@ -161,7 +161,7 @@ class AotDexoptStatusParserTest {
     }
 
     @Test
-    fun catalogContainsRequestedAppsWithoutDuplicatesOrSelf() {
+    fun catalogContainsRequestedAppsWithoutDuplicatesAndSelfLast() {
         val names = AotCatalog.PACKAGES.map(AotPackage::packageName)
 
         assertEquals(names.size, names.toSet().size)
@@ -172,11 +172,13 @@ class AotDexoptStatusParserTest {
                     "com.salat.gsplit",
                     "com.andrerinas.headunitrevived",
                     "com.andrerinas.headunitrevived.geely",
-                    "com.geely.atlaslauncher"
+                    "com.geely.atlaslauncher",
+                    "com.geely.online.service",
+                    "com.salat.gmediahud"
                 )
             )
         )
-        assertFalse("com.mmwtl.atlascodecfix" in names)
+        assertEquals("com.mmwtl.atlascodecfix", names.last())
     }
 
     @Test(expected = IllegalArgumentException::class)
