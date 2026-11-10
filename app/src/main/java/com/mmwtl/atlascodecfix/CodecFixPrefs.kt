@@ -40,6 +40,14 @@ class CodecFixPrefs(context: Context) {
             putInt(KEY_AUTO_APPLY_DELAY_SECONDS, AutoApplyDelay.normalize(value))
         }
 
+    var autoAotCompile: Boolean
+        get() = prefs.getBoolean(KEY_AUTO_AOT_COMPILE, false)
+        set(value) = prefs.edit { putBoolean(KEY_AUTO_AOT_COMPILE, value) }
+
+    /** True when the background job has any work: ADB is on and at least one auto action is. */
+    val autoWorkEnabled: Boolean
+        get() = adbEnabled && (autoApplyCodecFix || autoAotCompile)
+
     var skipCompatibilityCheck: Boolean
         get() = prefs.getBoolean(KEY_SKIP_COMPATIBILITY_CHECK, false)
         set(value) = prefs.edit { putBoolean(KEY_SKIP_COMPATIBILITY_CHECK, value) }
@@ -78,6 +86,7 @@ class CodecFixPrefs(context: Context) {
         private const val KEY_ADB_HOST = "adb_host"
         private const val KEY_ADB_PORT = "adb_port"
         private const val KEY_AUTO_APPLY = "auto_apply"
+        private const val KEY_AUTO_AOT_COMPILE = "auto_aot_compile"
         private const val KEY_AUTO_APPLY_DELAY_SECONDS = "auto_apply_delay_seconds"
         private const val KEY_SKIP_COMPATIBILITY_CHECK = "skip_compatibility_check"
         private const val KEY_ERROR_NOTIFICATIONS_ENABLED = "error_notifications_enabled"

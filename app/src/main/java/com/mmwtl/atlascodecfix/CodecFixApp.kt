@@ -9,6 +9,8 @@ class CodecFixApp : Application() {
         private set
     lateinit var codecFixRepository: HevcCodecFixRepository
         private set
+    lateinit var aotRepository: AotCompileRepository
+        private set
     lateinit var errorNotifier: ErrorNotifier
         private set
     lateinit var manualApplyNotifier: ManualApplyNotifier
@@ -19,6 +21,7 @@ class CodecFixApp : Application() {
         prefs = CodecFixPrefs(this)
         adbClient = AdbClient(this, prefs)
         codecFixRepository = HevcCodecFixRepository(this, adbClient)
+        aotRepository = AotCompileRepository(adbClient)
         errorNotifier = ErrorNotifier(this, prefs)
         manualApplyNotifier = ManualApplyNotifier(this)
     }

@@ -46,7 +46,7 @@ class AutoApplyJobService : JobService() {
         runningJob?.cancel()
         runningJob = null
         val prefs = currentApp().prefs
-        if (!prefs.autoApplyCodecFix || !prefs.adbEnabled) {
+        if (!prefs.autoWorkEnabled) {
             prefs.autoApplyRetryCount = 0
             return false
         }
@@ -69,7 +69,7 @@ class AutoApplyJobService : JobService() {
     private suspend fun performAutoApply(runToken: Long): Boolean {
         val app = currentApp()
         val prefs = app.prefs
-        if (!prefs.autoApplyCodecFix || !prefs.adbEnabled) {
+        if (!prefs.autoWorkEnabled) {
             prefs.autoApplyRetryCount = 0
             return false
         }
@@ -82,33 +82,55 @@ class AutoApplyJobService : JobService() {
             return retryOrStop(message)
         }
 
-        val targetVariant = prefs.selectedVariant
-        val result = app.codecFixRepository.runAutoApply(
-            AutoApplyRequest(
-                variant = targetVariant,
-                skipCompatibilityCheck = prefs.skipCompatibilityCheck
+        val retryableMessages = mutableListOf<String>()
+        val finalMessages = mutableListOf<String>()
+
+        if (prefs.autoApplyCodecFix) {
+            val targetVariant = prefs.selectedVariant
+            val result = app.codecFixRepository.runAutoApply(
+                AutoApplyRequest(
+                    variant = targetVariant,
+                    skipCompatibilityCheck = prefs.skipCompatibilityCheck
+                )
             )
-        )
-        if (!runGuard.isCurrent(runToken)) return false
-        if (result.success) {
-            prefs.autoApplyRetryCount = 0
-            Log.i(
-                TAG,
-                "Auto apply codec=${targetVariant.argument}: success"
-            )
-            return false
+            if (!runGuard.isCurrent(runToken)) return false
+            if (result.success) {
+                Log.i(TAG, "Auto apply codec=${targetVariant.argument}: success")
+            } else {
+                val message = result.output
+                    .trim()
+                    .takeLast(ERROR_TEXT_LIMIT)
+                    .ifBlank { getString(R.string.auto_apply_failed) }
+                if (result.retryable) retryableMessages += message else finalMessages += message
+            }
         }
 
-        val message = result.output
-            .trim()
-            .takeLast(ERROR_TEXT_LIMIT)
-            .ifBlank { getString(R.string.auto_apply_failed) }
-        return if (result.retryable) {
-            retryOrStop(message)
-        } else {
-            prefs.autoApplyRetryCount = 0
+        // AOT runs after the codec step and only recompiles packages that lost the speed filter,
+        // so a retry of the whole job is idempotent for both steps.
+        if (prefs.autoAotCompile) {
+            val result = app.aotRepository.compileOutdated()
+            if (!runGuard.isCurrent(runToken)) return false
+            if (result.success) {
+                Log.i(TAG, "Auto AOT compile: ${result.compiled.size} package(s) compiled")
+            } else {
+                val message = getString(
+                    R.string.auto_aot_failed,
+                    result.failed.joinToString { it.title }
+                        .ifBlank { getString(R.string.aot_status_check_failed) }
+                )
+                if (result.retryable) retryableMessages += message else finalMessages += message
+            }
+        }
+
+        if (finalMessages.isNotEmpty()) {
+            val message = finalMessages.joinToString("\n")
             Log.w(TAG, message)
             app.errorNotifier.notify(getString(R.string.app_name), message)
+        }
+        return if (retryableMessages.isNotEmpty()) {
+            retryOrStop(retryableMessages.joinToString("\n"))
+        } else {
+            prefs.autoApplyRetryCount = 0
             false
         }
     }

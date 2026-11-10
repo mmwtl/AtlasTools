@@ -1,4 +1,4 @@
-# AtlasCodecFix Repository Guide
+# AtlasTools Repository Guide
 
 ## Scope
 
@@ -15,21 +15,28 @@ These instructions apply to the entire repository.
   project produces that artifact.
 - Never include the branch name or its suffix in `versionCode`.
 - Preserve artifact naming through the effective version using
-  `<effectiveVersionName>[<versionCode>]AtlasCodecFix`.
+  `<effectiveVersionName>[<versionCode>]AtlasTools`.
+- The project was renamed from AtlasCodecFix. Keep `applicationId`, the Kotlin package and
+  manifest component class names unchanged so existing installs update in place and keep their
+  settings, ADB key, accessibility service and persisted jobs.
 
 ## Project purpose
 
-AtlasCodecFix is a small Android application for rooted, device-specific Android head units. It
-connects to the device's local `adbd`, stages media codec configuration files, bind-mounts selected
-files over `/vendor/etc`, and restarts media services. Treat every apply-path change as a safety-
-critical change: a partial configuration can break media playback until reboot.
+AtlasTools is a small Android application for rooted, device-specific Android head units. It
+connects to the device's local `adbd` and provides two tools:
+
+- Codec Fix: stages media codec configuration files, bind-mounts selected files over
+  `/vendor/etc`, and restarts media services. Treat every apply-path change as a safety-critical
+  change: a partial configuration can break media playback until reboot.
+- AOT: compiles a fixed catalog of Atlas and companion apps with the ART `speed` filter through
+  `cmd package compile`. It needs no root and must never touch `/vendor`.
 
 ## Required safety invariants
 
 1. `Default`/`msmnile` is an unconditional recovery operation. It must never be blocked by
    compatibility checks and must not depend on staging profile assets.
 2. Profile application is serialized process-wide. Never allow two staging/apply/detect sequences
-   to overlap.
+   to overlap. AOT status/compile sequences share the same `DeviceOperationLock`.
 3. A non-default profile is successful only when every requested bind mount succeeds and the final
    detected variant matches. On any mount failure, remove mounts created by that attempt and leave
    the device in the stock/default runtime state.
@@ -54,6 +61,8 @@ critical change: a partial configuration can break media playback until reboot.
 ## Source layout
 
 - `app/src/main/java/com/mmwtl/atlascodecfix/`: Android/Kotlin application code.
+- `Aot*.kt`: AOT catalog, `dexopt` status parser and compile repository. AOT success requires a
+  zero exit code and a re-read `speed` filter; only add packages to `AotCatalog` with tests.
 - `hevc/preflight.sh`: compatibility and device guard.
 - `hevc/codecfix.sh`: root-side restore/apply transaction.
 - `hevc/default/`: untouched reference files copied from target/vendor sources.
@@ -125,7 +134,8 @@ Add regression tests for every changed parser or safety rule. At minimum, preser
 - variant detection;
 - profile serialization;
 - shell apply success, partial-mount rollback, and restore idempotency;
-- profile file manifests and expected reference-file diffs.
+- profile file manifests and expected reference-file diffs;
+- AOT dexopt status parsing, compile verification and shared operation lock.
 
 Do not make unit tests depend on a running `adbd`, root, or the developer's signing files.
 

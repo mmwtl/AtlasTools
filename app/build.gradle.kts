@@ -45,7 +45,7 @@ val appVersionName = if (buildBranch == "main") {
 }
 
 base {
-    archivesName.set("$appVersionName[$baseVersionCode]AtlasCodecFix")
+    archivesName.set("$appVersionName[$baseVersionCode]AtlasTools")
 }
 
 android {

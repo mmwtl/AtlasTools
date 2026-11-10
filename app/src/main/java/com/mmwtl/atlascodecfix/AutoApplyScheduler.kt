@@ -12,9 +12,7 @@ object AutoApplyScheduler {
         resetRetries: Boolean = false
     ): Boolean {
         val app = context.applicationContext as CodecFixApp
-        return if (
-            app.prefs.autoApplyCodecFix && app.prefs.adbEnabled
-        ) {
+        return if (app.prefs.autoWorkEnabled) {
             schedule(context, resetRetries)
         } else {
             cancel(context)
@@ -47,7 +45,7 @@ object AutoApplyScheduler {
 
     fun ensureScheduled(context: Context): Boolean {
         val app = context.applicationContext as CodecFixApp
-        if (!app.prefs.autoApplyCodecFix || !app.prefs.adbEnabled) {
+        if (!app.prefs.autoWorkEnabled) {
             cancel(context)
             return true
         }

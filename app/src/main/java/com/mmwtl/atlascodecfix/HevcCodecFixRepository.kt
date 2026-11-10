@@ -7,7 +7,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
-import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import java.io.File
@@ -20,15 +19,15 @@ class HevcCodecFixRepository internal constructor(
 
     suspend fun checkCompatibility(): HevcCodecFixCompatibilityResult =
         withContext(Dispatchers.IO) {
-            operationMutex.withLock { checkCompatibilityLocked() }
+            DeviceOperationLock.mutex.withLock { checkCompatibilityLocked() }
         }
 
     suspend fun detectCurrentVariant(): HevcCodecFixDetectResult = withContext(Dispatchers.IO) {
-        operationMutex.withLock { detectCurrentVariantLocked() }
+        DeviceOperationLock.mutex.withLock { detectCurrentVariantLocked() }
     }
 
     suspend fun collectDiagnostics(): HevcCodecFixDiagnosticResult = withContext(Dispatchers.IO) {
-        operationMutex.withLock {
+        DeviceOperationLock.mutex.withLock {
             val identity = executeCatching(
                 buildDiagnosticIdentityCommand(),
                 DIAGNOSTICS_IDENTITY_TIMEOUT_MS
@@ -55,7 +54,7 @@ class HevcCodecFixRepository internal constructor(
     }
 
     suspend fun exportAnalysisBundle(): HevcCodecFixExportResult = withContext(Dispatchers.IO) {
-        operationMutex.withLock {
+        DeviceOperationLock.mutex.withLock {
             val commandResult = executeCatching(
                 buildAnalysisExportCommand(),
                 ANALYSIS_EXPORT_TIMEOUT_MS
@@ -110,7 +109,7 @@ class HevcCodecFixRepository internal constructor(
         requireAutoApplyAllowed: Boolean = false
     ): HevcCodecFixApplyResult =
         withContext(Dispatchers.IO) {
-            operationMutex.withLock {
+            DeviceOperationLock.mutex.withLock {
                 applyVariantLocked(
                     variant = variant,
                     allowRisky = allowRisky,
@@ -123,7 +122,7 @@ class HevcCodecFixRepository internal constructor(
 
     suspend fun runAutoApply(request: AutoApplyRequest): AutoApplyResult =
         withContext(Dispatchers.IO) {
-            operationMutex.withLock {
+            DeviceOperationLock.mutex.withLock {
                 var codecResult: HevcCodecFixApplyResult? = null
                 var codecSkipped = false
                 var detectOutput = ""
@@ -607,7 +606,6 @@ class HevcCodecFixRepository internal constructor(
     }
 
     private companion object {
-        private val operationMutex = Mutex()
         private const val TAG = "AtlasCodecFix"
         private const val PREFLIGHT_ASSET = "preflight.sh"
         private const val CODECFIX_ASSET = "codecfix.sh"

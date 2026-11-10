@@ -49,7 +49,7 @@ class CodecFixViewModel(
         app.prefs.adbEnabled = enabled
         _state.update { it.copy(adbEnabled = enabled) }
         if (enabled) {
-            if (app.prefs.autoApplyCodecFix) {
+            if (app.prefs.autoWorkEnabled) {
                 AutoApplyScheduler.schedule(app, resetRetries = true)
             }
             connectAdb()
@@ -282,6 +282,111 @@ class CodecFixViewModel(
         }
     }
 
+    fun onAotTabOpened() {
+        val current = _state.value
+        if (current.aotStatuses == null && current.adbEnabled && !current.isBusy) {
+            refreshAotStatus()
+        }
+    }
+
+    fun refreshAotStatus() {
+        launchOperation(text(R.string.aot_checking)) {
+            if (!_state.value.adbEnabled) {
+                _state.update { it.copy(status = text(R.string.adb_disabled_message)) }
+                return@launchOperation
+            }
+            val result = app.aotRepository.queryStatus()
+            val status = if (result.commandSuccess) {
+                aotSummary(result.packages)
+            } else {
+                result.output.trim().takeLast(STATUS_TEXT_LIMIT)
+                    .ifBlank { text(R.string.aot_status_check_failed) }
+            }
+            if (!result.commandSuccess) notifyError(text(R.string.error_title_aot), status)
+            _state.update { it.copy(aotStatuses = result.packages, status = status) }
+        }
+    }
+
+    fun compileOutdatedAot() {
+        launchOperation(text(R.string.aot_checking)) {
+            if (!_state.value.adbEnabled) {
+                _state.update { it.copy(status = text(R.string.adb_disabled_message)) }
+                return@launchOperation
+            }
+            val result = app.aotRepository.compileOutdated(aotProgressListener())
+            showAotCompileResult(result)
+        }
+    }
+
+    fun compileAotPackage(pkg: AotPackage) {
+        launchOperation(text(R.string.aot_checking)) {
+            if (!_state.value.adbEnabled) {
+                _state.update { it.copy(status = text(R.string.adb_disabled_message)) }
+                return@launchOperation
+            }
+            val result = app.aotRepository.compilePackage(pkg, aotProgressListener())
+            showAotCompileResult(result)
+        }
+    }
+
+    fun setAutoAotCompile(enabled: Boolean) {
+        if (_state.value.isBusy) return
+        if (enabled && !_state.value.adbEnabled) {
+            _state.update { it.copy(autoAotCompile = false, status = text(R.string.enable_adb_first)) }
+            return
+        }
+        app.prefs.autoAotCompile = enabled
+        app.prefs.autoApplyRetryCount = 0
+        val scheduled = if (enabled) {
+            AutoApplyScheduler.schedule(app, resetRetries = true)
+        } else {
+            cancelAutoApplyIfUnused()
+            true
+        }
+        val status = when {
+            enabled && scheduled -> text(R.string.auto_aot_enabled)
+            enabled -> text(R.string.auto_apply_schedule_failed)
+            else -> text(R.string.auto_aot_disabled)
+        }
+        if (!scheduled) notifyError(text(R.string.app_name), status)
+        _state.update { it.copy(autoAotCompile = enabled, status = status) }
+    }
+
+    private fun aotProgressListener() = AotCompileRepository.ProgressListener { pkg, index, total ->
+        _state.update {
+            it.copy(status = text(R.string.aot_compiling, pkg.title, index, total))
+        }
+    }
+
+    private fun showAotCompileResult(result: AotCompileResult) {
+        val status = when {
+            !result.statusSuccess -> result.statusOutput.trim().takeLast(STATUS_TEXT_LIMIT)
+                .ifBlank { text(R.string.aot_status_check_failed) }
+            result.requested.isEmpty() -> text(R.string.aot_nothing_to_compile)
+            result.success -> text(
+                R.string.aot_compiled,
+                result.compiled.joinToString { it.title }
+            )
+            else -> buildList {
+                if (result.compiled.isNotEmpty()) {
+                    add(text(R.string.aot_compiled, result.compiled.joinToString { it.title }))
+                }
+                add(text(R.string.aot_compile_failed, result.failed.joinToString { it.title }))
+                result.outcomes.lastOrNull { !it.success }?.output?.trim()
+                    ?.takeIf(String::isNotEmpty)
+                    ?.let(::add)
+            }.joinToString("\n").takeLast(STATUS_TEXT_LIMIT)
+        }
+        if (!result.success) notifyError(text(R.string.error_title_aot), status)
+        _state.update { it.copy(aotStatuses = result.statuses, status = status) }
+    }
+
+    private fun aotSummary(statuses: List<AotPackageStatus>): String {
+        val installed = statuses.count { it.state != AotCompileState.NOT_INSTALLED }
+        val compiled = statuses.count { it.state == AotCompileState.COMPILED }
+        return text(R.string.aot_summary, compiled, installed)
+    }
+
     fun setErrorNotificationsEnabled(enabled: Boolean) {
         app.prefs.errorNotificationsEnabled = enabled
         _state.update {
@@ -475,12 +580,13 @@ class CodecFixViewModel(
             autoApplyDelayText = prefs.autoApplyDelaySeconds.toString(),
             skipCompatibilityCheck = prefs.skipCompatibilityCheck,
             errorNotificationsEnabled = prefs.errorNotificationsEnabled,
+            autoAotCompile = prefs.autoAotCompile,
             selectedVariant = prefs.selectedVariant
         )
     }
 
     private fun cancelAutoApplyIfUnused() {
-        if (!app.prefs.autoApplyCodecFix) {
+        if (!app.prefs.autoWorkEnabled) {
             AutoApplyScheduler.cancel(app)
         }
     }
@@ -654,7 +760,10 @@ data class CodecFixScreenState(
     val connectionState: AdbConnectionState = AdbConnectionState.Disconnected,
     val isBusy: Boolean = false,
     val status: String? = null,
-    val confirmation: ApplyConfirmation? = null
+    val confirmation: ApplyConfirmation? = null,
+    val autoAotCompile: Boolean = false,
+    /** `null` until the AOT state has been read from the device. */
+    val aotStatuses: List<AotPackageStatus>? = null
 ) {
     val effectiveAutoApplyVariant: HevcCodecFixVariant
         get() = selectedVariant

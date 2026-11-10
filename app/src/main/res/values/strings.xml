@@ -1,6 +1,6 @@
 <resources>
-    <string name="app_name">Atlas Codec Fix</string>
-    <string name="notification_channel_errors">Ошибки Codec Fix</string>
+    <string name="app_name">Atlas Tools</string>
+    <string name="notification_channel_errors">Ошибки Atlas Tools</string>
     <string name="notification_channel_manual_apply">Результаты применения Codec Fix</string>
     <string name="manual_apply_notification_title">Codec Fix</string>
 
@@ -11,7 +11,8 @@
     <string name="variant_ultra_description">Максимальный C2/QTI-first набор — экспериментально</string>
     <string name="experimental_profiles_separator">Экспериментальные профили</string>
 
-    <string name="tab_profile">Профиль</string>
+    <string name="tab_profile">Кодеки</string>
+    <string name="tab_aot">AOT</string>
     <string name="tab_connection">Подключение</string>
     <string name="tab_autostart">Автозапуск</string>
     <string name="tab_diagnostics">Диагностика</string>
@@ -91,9 +92,9 @@
     <string name="auto_apply_failed">Не удалось выполнить выбранные автодействия</string>
     <string name="auto_apply_stopped">Автоприменение остановлено после %1$d попыток: %2$s</string>
     <string name="auto_apply_schedule_failed">Не удалось запланировать автоприменение</string>
-    <string name="auto_apply_accessibility_label">Надёжный автозапуск Codec Fix</string>
-    <string name="auto_apply_accessibility_description">Запускает проверку выбранного codec-профиля после загрузки и пробуждения ГУ. Не читает содержимое окон и не выполняет жесты.</string>
-    <string name="auto_apply_accessibility_hint">Резервный запуск: включите «Надёжный автозапуск Codec Fix» в спецвозможностях.</string>
+    <string name="auto_apply_accessibility_label">Надёжный автозапуск Atlas Tools</string>
+    <string name="auto_apply_accessibility_description">Запускает проверку выбранного codec-профиля и AOT-компиляции после загрузки и пробуждения ГУ. Не читает содержимое окон и не выполняет жесты.</string>
+    <string name="auto_apply_accessibility_hint">Резервный запуск: включите «Надёжный автозапуск Atlas Tools» в спецвозможностях.</string>
     <string name="open_accessibility_settings">Открыть специальные возможности</string>
     <string name="no_accessibility_settings">В прошивке нет системного экрана специальных возможностей</string>
     <string name="unsafe_disabled_auto_disabled">Небезопасный режим выключен; автоприменение экспериментального профиля отключено</string>
@@ -145,6 +146,29 @@
     <string name="codec_other">другое</string>
     <string name="codec_encoder">encoder</string>
     <string name="codec_decoder">decoder</string>
+
+    <string name="section_aot">AOT-компиляция (speed)</string>
+    <string name="aot_description">Заранее компилирует приложения Atlas целиком с профилем speed: быстрее запуск и отклик, но больше занятого места. После обновления приложения или прошивки компиляцию нужно повторить.</string>
+    <string name="action_aot_compile_outdated">Скомпилировать все</string>
+    <string name="action_aot_compile">Скомпилировать</string>
+    <string name="aot_state_unchecked">Не проверено</string>
+    <string name="aot_state_compiled">Скомпилировано: speed</string>
+    <string name="aot_state_not_compiled">Не скомпилировано: %1$s</string>
+    <string name="aot_state_not_installed">Не установлено</string>
+    <string name="aot_state_unknown">Состояние не определено</string>
+    <string name="aot_checking">Проверяю состояние AOT-компиляции</string>
+    <string name="aot_compiling">Компилирую %1$s (%2$d из %3$d)</string>
+    <string name="aot_summary">Скомпилировано speed: %1$d из %2$d установленных</string>
+    <string name="aot_nothing_to_compile">Все установленные приложения уже скомпилированы speed</string>
+    <string name="aot_compiled">Скомпилировано: %1$s</string>
+    <string name="aot_compile_failed">Не удалось скомпилировать: %1$s</string>
+    <string name="aot_status_check_failed">Не удалось проверить состояние компиляции</string>
+    <string name="error_title_aot">AOT-компиляция</string>
+    <string name="auto_aot">AOT после загрузки</string>
+    <string name="auto_aot_description">После загрузки проверяет приложения Atlas и перекомпилирует speed те, что его потеряли</string>
+    <string name="auto_aot_enabled">AOT-проверка после загрузки включена</string>
+    <string name="auto_aot_disabled">AOT-проверка после загрузки выключена</string>
+    <string name="auto_aot_failed">AOT-компиляция после загрузки не выполнена: %1$s</string>
 
     <string name="experimental_warning_short">%1$s использует возможности других платформ</string>
     <string name="risk_confirmation_title">Подтвердите риск</string>

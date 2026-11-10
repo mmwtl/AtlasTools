@@ -52,6 +52,7 @@ import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
@@ -116,6 +117,11 @@ class MainActivity : ComponentActivity() {
                     onCodecAudioChange = viewModel::setCodecAudioFilter,
                     onCodecVideoChange = viewModel::setCodecVideoFilter,
                     onErrorNotificationsChange = ::setErrorNotificationsEnabled,
+                    onAotTabOpened = viewModel::onAotTabOpened,
+                    onAotRefresh = viewModel::refreshAotStatus,
+                    onAotCompileOutdated = viewModel::compileOutdatedAot,
+                    onAotCompilePackage = viewModel::compileAotPackage,
+                    onAutoAotCompileChange = viewModel::setAutoAotCompile,
                     onConfirmApply = viewModel::confirmApply,
                     onDismissConfirmation = viewModel::dismissApplyConfirmation
                 )
@@ -186,6 +192,11 @@ private fun CodecFixScreen(
     onCodecAudioChange: (Boolean) -> Unit,
     onCodecVideoChange: (Boolean) -> Unit,
     onErrorNotificationsChange: (Boolean) -> Unit,
+    onAotTabOpened: () -> Unit,
+    onAotRefresh: () -> Unit,
+    onAotCompileOutdated: () -> Unit,
+    onAotCompilePackage: (AotPackage) -> Unit,
+    onAutoAotCompileChange: (Boolean) -> Unit,
     onConfirmApply: () -> Unit,
     onDismissConfirmation: () -> Unit
 ) {
@@ -275,6 +286,14 @@ private fun CodecFixScreen(
                         onRefresh = onRefresh,
                         onOpenConnection = { selectedTab = CodecFixTab.CONNECTION }
                     )
+                    CodecFixTab.AOT -> AotTab(
+                        state = state,
+                        onOpened = onAotTabOpened,
+                        onRefresh = onAotRefresh,
+                        onCompileOutdated = onAotCompileOutdated,
+                        onCompilePackage = onAotCompilePackage,
+                        onOpenConnection = { selectedTab = CodecFixTab.CONNECTION }
+                    )
                     CodecFixTab.CONNECTION -> ConnectionTab(
                         state = state,
                         onAdbEnabledChange = onAdbEnabledChange,
@@ -288,6 +307,7 @@ private fun CodecFixScreen(
                         state = state,
                         onAutoApplyCodecFixChange = onAutoApplyCodecFixChange,
                         onAutoApplyDelayChange = onAutoApplyDelayChange,
+                        onAutoAotCompileChange = onAutoAotCompileChange,
                         onOpenAccessibilitySettings = onOpenAccessibilitySettings,
                         onErrorNotificationsChange = onErrorNotificationsChange
                     )
@@ -375,6 +395,112 @@ private fun ProfileTab(
             ) {
                 Text(stringResource(R.string.action_check))
             }
+        }
+    }
+}
+
+@Composable
+private fun AotTab(
+    state: CodecFixScreenState,
+    onOpened: () -> Unit,
+    onRefresh: () -> Unit,
+    onCompileOutdated: () -> Unit,
+    onCompilePackage: (AotPackage) -> Unit,
+    onOpenConnection: () -> Unit
+) {
+    LaunchedEffect(Unit) { onOpened() }
+    val statuses = state.aotStatuses?.associateBy { it.pkg }.orEmpty()
+    val actionsEnabled = state.adbEnabled && !state.isBusy
+
+    Section(title = stringResource(R.string.section_aot)) {
+        Text(
+            text = stringResource(R.string.aot_description),
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+
+        CodecFixScreenRules.profileConnectionHint(state.adbEnabled, state.connectionState)
+            ?.let { hint ->
+                ConnectionHintRow(hint = hint, onOpenConnection = onOpenConnection)
+            }
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            Button(
+                modifier = Modifier.weight(1f),
+                enabled = actionsEnabled,
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = MaterialTheme.colorScheme.primary,
+                    contentColor = MaterialTheme.colorScheme.onPrimary
+                ),
+                shape = RoundedCornerShape(8.dp),
+                onClick = onCompileOutdated
+            ) {
+                Text(stringResource(R.string.action_aot_compile_outdated), fontWeight = FontWeight.Bold)
+            }
+            OutlinedButton(
+                enabled = actionsEnabled,
+                shape = RoundedCornerShape(8.dp),
+                onClick = onRefresh
+            ) {
+                Text(stringResource(R.string.action_check))
+            }
+        }
+
+        AotCatalog.PACKAGES.forEach { pkg ->
+            HorizontalDivider()
+            AotPackageRow(
+                pkg = pkg,
+                status = statuses[pkg],
+                enabled = actionsEnabled,
+                onCompile = { onCompilePackage(pkg) }
+            )
+        }
+    }
+}
+
+@Composable
+private fun AotPackageRow(
+    pkg: AotPackage,
+    status: AotPackageStatus?,
+    enabled: Boolean,
+    onCompile: () -> Unit
+) {
+    val (stateText, stateColor) = when (status?.state) {
+        null -> stringResource(R.string.aot_state_unchecked) to
+            MaterialTheme.colorScheme.onSurfaceVariant
+        AotCompileState.COMPILED -> stringResource(R.string.aot_state_compiled) to
+            MaterialTheme.colorScheme.primary
+        AotCompileState.NOT_COMPILED -> stringResource(
+            R.string.aot_state_not_compiled,
+            status.filters.joinToString()
+        ) to MaterialTheme.colorScheme.error
+        AotCompileState.NOT_INSTALLED -> stringResource(R.string.aot_state_not_installed) to
+            MaterialTheme.colorScheme.outline
+        AotCompileState.UNKNOWN -> stringResource(R.string.aot_state_unknown) to
+            MaterialTheme.colorScheme.onSurfaceVariant
+    }
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Column(modifier = Modifier.weight(1f)) {
+            Text(pkg.title, fontWeight = FontWeight.Medium)
+            Text(
+                text = pkg.packageName,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                fontSize = 12.sp
+            )
+            Text(text = stateText, color = stateColor, fontSize = 13.sp)
+        }
+        OutlinedButton(
+            enabled = enabled && status?.state != AotCompileState.NOT_INSTALLED,
+            shape = RoundedCornerShape(8.dp),
+            onClick = onCompile
+        ) {
+            Text(stringResource(R.string.action_aot_compile))
         }
     }
 }
@@ -481,6 +607,7 @@ private fun AutostartTab(
     state: CodecFixScreenState,
     onAutoApplyCodecFixChange: (Boolean) -> Unit,
     onAutoApplyDelayChange: (String) -> Unit,
+    onAutoAotCompileChange: (Boolean) -> Unit,
     onOpenAccessibilitySettings: () -> Unit,
     onErrorNotificationsChange: (Boolean) -> Unit
 ) {
@@ -517,6 +644,14 @@ private fun AutostartTab(
             singleLine = true,
             shape = RoundedCornerShape(8.dp),
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
+        )
+
+        SwitchSettingRow(
+            title = stringResource(R.string.auto_aot),
+            description = stringResource(R.string.auto_aot_description),
+            checked = state.autoAotCompile,
+            enabled = (state.adbEnabled || state.autoAotCompile) && !state.isBusy,
+            onCheckedChange = onAutoAotCompileChange
         )
 
         Text(

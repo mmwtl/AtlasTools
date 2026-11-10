@@ -5,6 +5,7 @@ import androidx.annotation.StringRes
 /** Main screen tabs. The primary action (profile selection and apply) stays first. */
 enum class CodecFixTab(@param:StringRes val titleRes: Int) {
     PROFILE(R.string.tab_profile),
+    AOT(R.string.tab_aot),
     CONNECTION(R.string.tab_connection),
     AUTOSTART(R.string.tab_autostart),
     DIAGNOSTICS(R.string.tab_diagnostics)

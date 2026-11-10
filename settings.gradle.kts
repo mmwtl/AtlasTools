@@ -20,5 +20,5 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "AtlasCodecFix"
+rootProject.name = "AtlasTools"
 include(":app")

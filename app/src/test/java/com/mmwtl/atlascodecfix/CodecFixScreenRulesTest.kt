@@ -10,6 +10,7 @@ class CodecFixScreenRulesTest {
         assertEquals(
             listOf(
                 CodecFixTab.PROFILE,
+                CodecFixTab.AOT,
                 CodecFixTab.CONNECTION,
                 CodecFixTab.AUTOSTART,
                 CodecFixTab.DIAGNOSTICS
