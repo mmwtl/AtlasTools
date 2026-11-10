@@ -93,7 +93,7 @@ class AotCompileRepository(
     }
 
     private suspend fun queryStatusLocked(targets: List<AotPackage>): AotStatusResult {
-        val result = executeCatching(buildStatusCommand(targets), STATUS_TIMEOUT_MS)
+        val result = executeCatching(buildStatusCommand(), STATUS_TIMEOUT_MS)
         val output = result.displayOutput
         val success = result.succeeded && AotDexoptStatusParser.hasEndMarker(result.stdout)
         return AotStatusResult(
@@ -127,17 +127,10 @@ class AotCompileRepository(
         internal const val COMPILE_TIMEOUT_MS = 300_000L
         internal const val COMPILER_FILTER = "speed"
 
-        internal fun buildStatusCommand(targets: List<AotPackage>): String {
-            val quoted = targets.joinToString(" ") { it.packageName.shellQuote() }
-            return buildString {
-                append("for p in ").append(quoted).append("; do ")
-                append("echo \"${AotDexoptStatusParser.PACKAGE_MARKER}\$p\"; ")
-                append("dumpsys package dexopt \"\$p\" 2>&1; ")
-                append("echo \"${AotDexoptStatusParser.DUMP_EXIT_MARKER}\$?\"; ")
-                append("done; ")
-                append("echo ${AotDexoptStatusParser.END_MARKER}")
-            }
-        }
+        internal fun buildStatusCommand(): String =
+            "dumpsys package dexopt 2>&1; " +
+                "echo \"${AotDexoptStatusParser.DUMP_EXIT_MARKER}\$?\"; " +
+                "echo ${AotDexoptStatusParser.END_MARKER}"
 
         internal fun buildCompileCommand(pkg: AotPackage): String =
             "cmd package compile -m $COMPILER_FILTER -f ${pkg.packageName.shellQuote()}"

@@ -160,11 +160,10 @@ class AotCompileRepositoryTest {
     }
 
     @Test
-    fun statusCommandQuotesPackagesAndFramesEachSection() {
-        val command = AotCompileRepository.buildStatusCommand(listOf(launcher, gsplit))
+    fun statusCommandDumpsOnceAndFramesTheExitCode() {
+        val command = AotCompileRepository.buildStatusCommand()
 
-        assertTrue(command.contains("for p in 'com.geely.atlaslauncher' 'com.salat.gsplit'; do"))
-        assertTrue(command.contains("dumpsys package dexopt \"\$p\""))
+        assertTrue(command.startsWith("dumpsys package dexopt 2>&1; "))
         assertTrue(command.contains("${AotDexoptStatusParser.DUMP_EXIT_MARKER}\$?"))
         assertTrue(command.endsWith("echo ${AotDexoptStatusParser.END_MARKER}"))
         assertFalse(command.contains("su "))
@@ -192,7 +191,7 @@ class AotCompileRepositoryTest {
                 if (commandDelayMs > 0) delay(commandDelayMs)
                 return when {
                     command.startsWith("cmd package compile") -> compile(command)
-                    command.startsWith("for p in") -> status(command)
+                    command.startsWith("dumpsys package dexopt") -> status()
                     else -> AdbCommandResult(stdout = "variant:msmnile", exitCode = 0)
                 }
             } finally {
@@ -211,25 +210,19 @@ class AotCompileRepositoryTest {
             )
         }
 
-        private fun status(command: String): AdbCommandResult {
+        private fun status(): AdbCommandResult {
             statusFailure?.let { return AdbCommandResult.failure(it, "simulated $it") }
-            val packages = Regex("'([^']+)'").findAll(command.substringBefore("; do"))
-                .map { it.groupValues[1] }
-                .toList()
             val output = buildString {
-                packages.forEach { pkg ->
-                    appendLine("${AotDexoptStatusParser.PACKAGE_MARKER}$pkg")
-                    val filter = filters[pkg]
-                    if (filter == null) {
-                        appendLine("Unable to find package: $pkg")
-                    } else {
-                        appendLine("Dexopt state:")
-                        appendLine("  [$pkg]")
-                        appendLine("    path: /data/app/$pkg/base.apk")
-                        appendLine("      arm64: [status=$filter] [reason=test]")
-                    }
-                    appendLine("${AotDexoptStatusParser.DUMP_EXIT_MARKER}0")
+                appendLine("Dexopt state:")
+                appendLine("  [com.unrelated.app]")
+                appendLine("    path: /data/app/unrelated/base.apk")
+                appendLine("      arm64: [status=verify] [reason=install]")
+                filters.toSortedMap().forEach { (pkg, filter) ->
+                    appendLine("  [$pkg]")
+                    appendLine("    path: /data/app/$pkg/base.apk")
+                    appendLine("      arm64: [status=$filter] [reason=test]")
                 }
+                appendLine("${AotDexoptStatusParser.DUMP_EXIT_MARKER}0")
                 appendLine(AotDexoptStatusParser.END_MARKER)
             }
             return AdbCommandResult(stdout = output, exitCode = 0)

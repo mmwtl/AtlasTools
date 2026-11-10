@@ -131,8 +131,8 @@ class AotDexoptStatusParserTest {
 
     @Test
     fun failedDumpOrMissingSectionIsUnknownNotInstalledOrCompiled() {
-        val failedDump = "${AotDexoptStatusParser.PACKAGE_MARKER}${launcher.packageName}\n" +
-            "Can't find service: package\n${AotDexoptStatusParser.DUMP_EXIT_MARKER}255\n" + END
+        val failedDump = "Can't find service: package\n" +
+            "${AotDexoptStatusParser.DUMP_EXIT_MARKER}255\n${AotDexoptStatusParser.END_MARKER}\n"
 
         assertEquals(
             AotCompileState.UNKNOWN,
@@ -140,7 +140,7 @@ class AotDexoptStatusParserTest {
         )
         assertEquals(
             AotCompileState.UNKNOWN,
-            AotDexoptStatusParser.parse(END, listOf(launcher)).single().state
+            AotDexoptStatusParser.parse("Dexopt state:\n", listOf(launcher)).single().state
         )
     }
 
@@ -186,12 +186,47 @@ class AotDexoptStatusParserTest {
         AotPackage("com.example;reboot", "bad")
     }
 
-    private fun section(pkg: AotPackage, body: String): String =
-        "${AotDexoptStatusParser.PACKAGE_MARKER}${pkg.packageName}\n" +
-            body.trimIndent() + "\n" +
-            "${AotDexoptStatusParser.DUMP_EXIT_MARKER}0\n"
+    @Test
+    fun android11EmulatorFullDumpIsParsed() {
+        // Trimmed from a real Android 11 `dumpsys package dexopt`, which ignores a package filter.
+        val output = """
+            Dexopt state:
+              [com.google.android.youtube]
+                path: /product/app/YouTube/YouTube.apk
+                  arm64: [status=quicken] [reason=prebuilt]
+                  known secondary dex files:
+                    /data/user/0/com.google.android.youtube/cache/1588009193101.jar
+                      class loader context: PCL[];PCL[/product/app/YouTube/YouTube.apk]
+              [com.android.cts.priv.ctsshim]
+              [com.mmwtl.atlasclimatewidget]
+                path: /data/app/~~MMdB==/com.mmwtl.atlasclimatewidget-GPvE==/base.apk
+                  arm64: [status=verify] [reason=boot]
+              [com.geely.atlaslauncher]
+                path: /data/app/~~pymp==/com.geely.atlaslauncher-c2Yf==/base.apk
+                  arm64: [status=speed] [reason=cmdline]
+                  used by other apps: [com.mmwtl.atlasappwidget]
+        """.trimIndent() + "\n" + END
+        val climate = AotPackage("com.mmwtl.atlasclimatewidget", "Climate")
+        val shim = AotPackage("com.android.cts.priv.ctsshim", "Shim")
+
+        val statuses = AotDexoptStatusParser.parse(output, listOf(climate, launcher, shim, headunit))
+
+        assertEquals(
+            listOf(
+                AotCompileState.NOT_COMPILED,
+                AotCompileState.COMPILED,
+                AotCompileState.UNKNOWN,
+                AotCompileState.NOT_INSTALLED
+            ),
+            statuses.map(AotPackageStatus::state)
+        )
+        assertEquals(listOf("verify"), statuses[0].filters)
+    }
+
+    private fun section(@Suppress("UNUSED_PARAMETER") pkg: AotPackage, body: String): String =
+        body.trimIndent() + "\n"
 
     private companion object {
-        val END = AotDexoptStatusParser.END_MARKER + "\n"
+        val END = "${AotDexoptStatusParser.DUMP_EXIT_MARKER}0\n${AotDexoptStatusParser.END_MARKER}\n"
     }
 }

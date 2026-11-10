@@ -61,11 +61,11 @@ data class AotPackageStatus(
 )
 
 /**
- * Parses the machine-framed output of the AOT status command. Each package section starts with
- * `aot_pkg:<name>`, holds `dumpsys package dexopt <name>` output and ends with `aot_dump_exit:<n>`.
+ * Parses the output of the AOT status command: one full `dumpsys package dexopt` followed by
+ * `aot_dump_exit:<n>` and `aot_end`. Android 11 ignores a package argument to `dexopt` and always
+ * dumps every package, so the dump is read once and searched for each `[package]` block.
  */
 object AotDexoptStatusParser {
-    const val PACKAGE_MARKER = "aot_pkg:"
     const val DUMP_EXIT_MARKER = "aot_dump_exit:"
     const val END_MARKER = "aot_end"
 
@@ -77,49 +77,31 @@ object AotDexoptStatusParser {
         output.lineSequence().any { it.trim() == END_MARKER }
 
     fun parse(output: String, packages: List<AotPackage>): List<AotPackageStatus> {
-        val sections = splitSections(output)
-        return packages.map { pkg ->
-            val section = sections[pkg.packageName]
-                ?: return@map AotPackageStatus(pkg, AotCompileState.UNKNOWN)
-            parseSection(pkg, section)
-        }
-    }
-
-    private fun splitSections(output: String): Map<String, List<String>> {
-        val sections = linkedMapOf<String, MutableList<String>>()
-        var current: MutableList<String>? = null
-        output.lineSequence().forEach { line ->
-            val trimmed = line.trim()
-            when {
-                trimmed.startsWith(PACKAGE_MARKER) -> {
-                    current = mutableListOf<String>().also {
-                        sections[trimmed.removePrefix(PACKAGE_MARKER).trim()] = it
-                    }
-                }
-                trimmed == END_MARKER -> current = null
-                else -> current?.add(line)
-            }
-        }
-        return sections
-    }
-
-    private fun parseSection(pkg: AotPackage, lines: List<String>): AotPackageStatus {
+        val lines = output.lines()
         val dumpExit = lines.firstNotNullOfOrNull { line ->
             line.trim().takeIf { it.startsWith(DUMP_EXIT_MARKER) }
                 ?.removePrefix(DUMP_EXIT_MARKER)
                 ?.trim()
                 ?.toIntOrNull()
         }
-        if (dumpExit != 0) return AotPackageStatus(pkg, AotCompileState.UNKNOWN)
-
-        val headerIndex = lines.indexOfFirst { line ->
-            PACKAGE_HEADER.find(line)?.groupValues?.get(1) == pkg.packageName
+        if (dumpExit != 0 || !hasEndMarker(output)) {
+            return packages.map { AotPackageStatus(it, AotCompileState.UNKNOWN) }
         }
-        if (headerIndex < 0) return AotPackageStatus(pkg, AotCompileState.NOT_INSTALLED)
+        val headers = HashMap<String, Int>()
+        lines.forEachIndexed { index, line ->
+            PACKAGE_HEADER.find(line)?.groupValues?.get(1)?.let { headers.putIfAbsent(it, index) }
+        }
+        return packages.map { pkg ->
+            val headerIndex = headers[pkg.packageName]
+                ?: return@map AotPackageStatus(pkg, AotCompileState.NOT_INSTALLED)
+            parseBlock(pkg, lines, headerIndex)
+        }
+    }
 
+    private fun parseBlock(pkg: AotPackage, lines: List<String>, headerIndex: Int): AotPackageStatus {
         val filters = mutableListOf<String>()
         for (line in lines.drop(headerIndex + 1)) {
-            if (PACKAGE_HEADER.matches(line)) break
+            if (PACKAGE_HEADER.matches(line) || line.trim().startsWith(DUMP_EXIT_MARKER)) break
             // Secondary dex files are loaded by the app at runtime and are not compiled by
             // `cmd package compile`; counting them would make a package look permanently stale.
             if (line.contains("secondary dex", ignoreCase = true)) break
