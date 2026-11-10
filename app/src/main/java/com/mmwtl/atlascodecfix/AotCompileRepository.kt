@@ -13,7 +13,8 @@ import kotlinx.coroutines.withContext
  */
 class AotCompileRepository(
     private val adb: AdbCommandExecutor,
-    private val packages: List<AotPackage> = AotCatalog.PACKAGES
+    private val packages: List<AotPackage> = AotCatalog.PACKAGES,
+    private val isDebuggable: (String) -> Boolean = { false }
 ) {
     fun interface ProgressListener {
         suspend fun onCompiling(pkg: AotPackage, index: Int, total: Int)
@@ -50,8 +51,8 @@ class AotCompileRepository(
             if (!before.commandSuccess) {
                 return@withLock AotCompileResult(statuses = before.packages, statusOutput = before.output)
             }
-            val installed = before.packages.first { it.pkg == pkg }.state != AotCompileState.NOT_INSTALLED
-            compileLocked(before, if (installed) listOf(pkg) else emptyList(), progress)
+            val compilable = before.packages.first { it.pkg == pkg }.state !in NOT_COMPILABLE
+            compileLocked(before, if (compilable) listOf(pkg) else emptyList(), progress)
         }
     }
 
@@ -98,13 +99,20 @@ class AotCompileRepository(
         val success = result.succeeded && AotDexoptStatusParser.hasEndMarker(result.stdout)
         return AotStatusResult(
             packages = if (success) {
-                AotDexoptStatusParser.parse(result.stdout, targets)
+                AotDexoptStatusParser.parse(result.stdout, targets).map(::markDebuggable)
             } else {
                 targets.map { AotPackageStatus(it, AotCompileState.UNKNOWN) }
             },
             output = output,
             commandSuccess = success
         )
+    }
+
+    private fun markDebuggable(status: AotPackageStatus): AotPackageStatus {
+        if (status.state != AotCompileState.NOT_COMPILED) return status
+        // Unknown flag: keep NOT_COMPILED so a real stale build is still compiled.
+        val debuggable = runCatching { isDebuggable(status.pkg.packageName) }.getOrDefault(false)
+        return if (debuggable) status.copy(state = AotCompileState.DEBUGGABLE) else status
     }
 
     private suspend fun executeCatching(command: String, timeoutMs: Long): AdbCommandResult {
@@ -126,6 +134,7 @@ class AotCompileRepository(
         internal const val STATUS_TIMEOUT_MS = 60_000L
         internal const val COMPILE_TIMEOUT_MS = 300_000L
         internal const val COMPILER_FILTER = "speed"
+        private val NOT_COMPILABLE = setOf(AotCompileState.NOT_INSTALLED, AotCompileState.DEBUGGABLE)
 
         internal fun buildStatusCommand(): String =
             "dumpsys package dexopt 2>&1; " +

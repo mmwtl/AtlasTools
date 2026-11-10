@@ -47,6 +47,12 @@ enum class AotCompileState {
     /** Installed, but at least one primary dex file uses a weaker filter. */
     NOT_COMPILED,
 
+    /**
+     * A debuggable build that is not compiled with `speed`. ART caps debuggable apps at
+     * `quicken`/`verify`, so compiling it again cannot succeed and it is never targeted.
+     */
+    DEBUGGABLE,
+
     /** The package manager does not know the package. */
     NOT_INSTALLED,
 

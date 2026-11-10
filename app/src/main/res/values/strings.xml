@@ -155,11 +155,12 @@
     <string name="aot_state_compiled">Скомпилировано: speed</string>
     <string name="aot_state_not_compiled">Не скомпилировано: %1$s</string>
     <string name="aot_state_not_installed">Не установлено</string>
+    <string name="aot_state_debuggable">Debug-сборка: speed недоступен (%1$s)</string>
     <string name="aot_state_unknown">Состояние не определено</string>
     <string name="aot_checking">Проверяю состояние AOT-компиляции</string>
     <string name="aot_compiling">Компилирую %1$s (%2$d из %3$d)</string>
     <string name="aot_summary">Скомпилировано speed: %1$d из %2$d установленных</string>
-    <string name="aot_nothing_to_compile">Все установленные приложения уже скомпилированы speed</string>
+    <string name="aot_nothing_to_compile">Все приложения, доступные для speed, уже скомпилированы</string>
     <string name="aot_compiled">Скомпилировано: %1$s</string>
     <string name="aot_compile_failed">Не удалось скомпилировать: %1$s</string>
     <string name="aot_status_check_failed">Не удалось проверить состояние компиляции</string>

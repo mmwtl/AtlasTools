@@ -476,6 +476,10 @@ private fun AotPackageRow(
             R.string.aot_state_not_compiled,
             status.filters.joinToString()
         ) to MaterialTheme.colorScheme.error
+        AotCompileState.DEBUGGABLE -> stringResource(
+            R.string.aot_state_debuggable,
+            status.filters.joinToString()
+        ) to MaterialTheme.colorScheme.outline
         AotCompileState.NOT_INSTALLED -> stringResource(R.string.aot_state_not_installed) to
             MaterialTheme.colorScheme.outline
         AotCompileState.UNKNOWN -> stringResource(R.string.aot_state_unknown) to
@@ -496,7 +500,8 @@ private fun AotPackageRow(
             Text(text = stateText, color = stateColor, fontSize = 13.sp)
         }
         OutlinedButton(
-            enabled = enabled && status?.state != AotCompileState.NOT_INSTALLED,
+            enabled = enabled && status?.state != AotCompileState.NOT_INSTALLED &&
+                status?.state != AotCompileState.DEBUGGABLE,
             shape = RoundedCornerShape(8.dp),
             onClick = onCompile
         ) {

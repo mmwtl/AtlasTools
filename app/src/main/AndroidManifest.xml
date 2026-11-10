@@ -5,6 +5,25 @@
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
 
+    <!-- AOT catalog: lets the app read the debuggable flag. Keep in sync with AotCatalog. -->
+    <queries>
+        <package android:name="com.geely.atlaslauncher" />
+        <package android:name="com.mmwtl.atlasappwidget" />
+        <package android:name="com.mmwtl.atlasappwindow" />
+        <package android:name="com.mmwtl.atlasclimatewidget" />
+        <package android:name="com.mmwtl.atlasmediawidget" />
+        <package android:name="com.mmwtl.atlasmediaapi" />
+        <package android:name="com.mmwtl.atlasdim" />
+        <package android:name="com.mmwtl.atlasterminal" />
+        <package android:name="com.mmwtl.gibcompanion" />
+        <package android:name="com.salat.gbinder" />
+        <package android:name="com.salat.gsplit" />
+        <package android:name="com.andrerinas.headunitrevived" />
+        <package android:name="com.andrerinas.headunitrevived.geely" />
+        <package android:name="com.geely.online.service" />
+        <package android:name="com.salat.gmediahud" />
+    </queries>
+
     <application
         android:name=".CodecFixApp"
         android:allowBackup="false"

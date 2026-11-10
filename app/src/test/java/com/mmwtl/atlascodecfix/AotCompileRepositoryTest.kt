@@ -169,6 +169,62 @@ class AotCompileRepositoryTest {
         assertFalse(command.contains("su "))
     }
 
+    @Test
+    fun debuggableBuildsAreMarkedAndNeverCompiled() = runBlocking {
+        val device = FakeDevice(
+            filters = mutableMapOf(
+                launcher.packageName to "quicken",
+                gsplit.packageName to "speed-profile"
+            )
+        )
+        val repository = AotCompileRepository(device, catalog) { it == launcher.packageName }
+
+        val batch = repository.compileOutdated()
+        val single = repository.compilePackage(launcher)
+
+        assertTrue(batch.success)
+        assertEquals(listOf(gsplit), batch.compiled)
+        assertTrue(single.requested.isEmpty())
+        assertEquals(listOf(gsplit.packageName), device.compiled)
+        assertEquals(
+            AotCompileState.DEBUGGABLE,
+            batch.statuses.single { it.pkg == launcher }.state
+        )
+    }
+
+    @Test
+    fun compiledDebuggableBuildStaysCompiledAndBrokenFlagLookupIsIgnored() = runBlocking {
+        val device = FakeDevice(
+            filters = mutableMapOf(
+                launcher.packageName to "speed",
+                gsplit.packageName to "verify"
+            )
+        )
+        val repository = AotCompileRepository(device, catalog) { name ->
+            if (name == gsplit.packageName) error("package manager unavailable") else true
+        }
+
+        val states = repository.queryStatus().packages.associate { it.pkg to it.state }
+
+        assertEquals(AotCompileState.COMPILED, states[launcher])
+        assertEquals(AotCompileState.NOT_COMPILED, states[gsplit])
+    }
+
+    @Test
+    fun manifestQueriesCoverEveryOtherCatalogPackage() {
+        val manifest = listOf(File("src/main/AndroidManifest.xml"), File("app/src/main/AndroidManifest.xml"))
+            .first(File::isFile)
+            .readText()
+        val queried = Regex("""<package android:name="([^"]+)"""").findAll(manifest)
+            .map { it.groupValues[1] }
+            .toSet()
+        val expected = AotCatalog.PACKAGES.map(AotPackage::packageName)
+            .filterNot { it == BuildConfig.APPLICATION_ID }
+            .toSet()
+
+        assertEquals(expected, queried)
+    }
+
     /** Simulates the package manager: answers dexopt dumps and applies compile requests. */
     private class FakeDevice(
         private val filters: MutableMap<String, String>,

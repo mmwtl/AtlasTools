@@ -63,6 +63,8 @@ connects to the device's local `adbd` and provides two tools:
 - `app/src/main/java/com/mmwtl/atlascodecfix/`: Android/Kotlin application code.
 - `Aot*.kt`: AOT catalog, `dexopt` status parser and compile repository. AOT success requires a
   zero exit code and a re-read `speed` filter; only add packages to `AotCatalog` with tests.
+- `scripts/emulator-telnet-shell.sh`: emulator-only localhost root shell for exercising Telnet
+  mode; it must keep refusing non-emulator devices.
 - `hevc/preflight.sh`: compatibility and device guard.
 - `hevc/codecfix.sh`: root-side restore/apply transaction.
 - `hevc/default/`: untouched reference files copied from target/vendor sources.
