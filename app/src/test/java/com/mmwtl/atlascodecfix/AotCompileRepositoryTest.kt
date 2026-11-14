@@ -142,6 +142,46 @@ class AotCompileRepositoryTest {
     }
 
     @Test
+    fun packageListIsReadAtTheStartOfEachSequence() = runBlocking {
+        val vlc = AotPackage("org.videolan.vlc", "VLC")
+        val device = FakeDevice(
+            filters = mutableMapOf(
+                launcher.packageName to "speed",
+                vlc.packageName to "speed-profile"
+            )
+        )
+        var listed = listOf(launcher)
+        val repository = AotCompileRepository(device, packages = { listed })
+
+        assertTrue(repository.compileOutdated().requested.isEmpty())
+
+        listed = listOf(launcher, vlc)
+        val result = repository.compileOutdated()
+
+        assertTrue(result.success)
+        assertEquals(listOf(vlc), result.compiled)
+        assertEquals(listOf(vlc.packageName), device.compiled)
+    }
+
+    @Test
+    fun compilePackageMatchesByPackageNameWhenTheLabelChanged() = runBlocking {
+        val device = FakeDevice(filters = mutableMapOf(gsplit.packageName to "verify"))
+        val repository = AotCompileRepository(device, catalog)
+
+        val result = repository.compilePackage(AotPackage(gsplit.packageName, "Renamed"))
+
+        assertTrue(result.success)
+        assertEquals(listOf(gsplit), result.compiled)
+    }
+
+    @Test(expected = IllegalArgumentException::class)
+    fun compilePackageRejectsAPackageOutsideTheList(): Unit = runBlocking {
+        val device = FakeDevice(filters = mutableMapOf())
+        AotCompileRepository(device, catalog).compilePackage(AotPackage("org.videolan.vlc", "VLC"))
+        Unit
+    }
+
+    @Test
     fun aotAndCodecOperationsShareOneProcessWideLock() = runBlocking {
         val device = FakeDevice(
             filters = mutableMapOf(gsplit.packageName to "verify"),

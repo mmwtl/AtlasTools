@@ -9,8 +9,10 @@ data class AotPackage(
         require(PACKAGE_NAME_PATTERN.matches(packageName)) { "Invalid package name: $packageName" }
     }
 
-    private companion object {
+    companion object {
         private val PACKAGE_NAME_PATTERN = Regex("""[A-Za-z][A-Za-z0-9_]*(\.[A-Za-z][A-Za-z0-9_]*)+""")
+
+        fun isValidPackageName(packageName: String): Boolean = PACKAGE_NAME_PATTERN.matches(packageName)
     }
 }
 
@@ -37,6 +39,67 @@ object AotCatalog {
         AotPackage("com.salat.gmediahud", "GMediaHud (GMH)"),
         AotPackage(BuildConfig.APPLICATION_ID, "Atlas Tools")
     )
+
+    private val CATALOG_NAMES: Set<String> = PACKAGES.mapTo(HashSet(), AotPackage::packageName)
+
+    fun isCatalogPackage(packageName: String): Boolean = packageName in CATALOG_NAMES
+
+    /**
+     * The effective AOT list: the catalog, then the user's own selection sorted by title, with
+     * AtlasTools kept last. Catalog packages and duplicates in [custom] are ignored.
+     */
+    fun withCustom(custom: List<AotPackage>): List<AotPackage> {
+        val self = PACKAGES.last()
+        val extra = custom
+            .filterNot { isCatalogPackage(it.packageName) }
+            .distinctBy(AotPackage::packageName)
+            .sortedWith(compareBy(String.CASE_INSENSITIVE_ORDER, AotPackage::title).thenBy(AotPackage::packageName))
+        return PACKAGES.dropLast(1) + extra + self
+    }
+}
+
+/** An application installed on the device, offered in the AOT app picker. */
+data class InstalledApp(
+    val packageName: String,
+    val label: String,
+    val isSystem: Boolean
+)
+
+object AotAppPicker {
+    /**
+     * Apps offered for selection: installed non-catalog apps (system apps only when
+     * [showSystem]), plus selected apps that are no longer installed so they can be removed.
+     * Selected apps come first, then everything sorted by label.
+     */
+    fun entries(
+        installed: List<InstalledApp>,
+        selected: Set<String>,
+        showSystem: Boolean,
+        query: String
+    ): List<InstalledApp> {
+        val installedNames = installed.mapTo(HashSet(), InstalledApp::packageName)
+        val missing = selected
+            .filterNot { it in installedNames }
+            .map { InstalledApp(it, it, isSystem = false) }
+        val needle = query.trim()
+        return (installed + missing)
+            .asSequence()
+            .filterNot { AotCatalog.isCatalogPackage(it.packageName) }
+            .filter { AotPackage.isValidPackageName(it.packageName) }
+            .filter { showSystem || !it.isSystem || it.packageName in selected }
+            .filter {
+                needle.isEmpty() ||
+                    it.label.contains(needle, ignoreCase = true) ||
+                    it.packageName.contains(needle, ignoreCase = true)
+            }
+            .distinctBy(InstalledApp::packageName)
+            .sortedWith(
+                compareBy<InstalledApp> { it.packageName !in selected }
+                    .thenBy(String.CASE_INSENSITIVE_ORDER, InstalledApp::label)
+                    .thenBy(InstalledApp::packageName)
+            )
+            .toList()
+    }
 }
 
 enum class AotCompileState {

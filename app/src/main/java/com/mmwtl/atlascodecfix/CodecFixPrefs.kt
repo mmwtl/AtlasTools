@@ -44,6 +44,19 @@ class CodecFixPrefs(context: Context) {
         get() = prefs.getBoolean(KEY_AUTO_AOT_COMPILE, false)
         set(value) = prefs.edit { putBoolean(KEY_AUTO_AOT_COMPILE, value) }
 
+    /** Package names the user added to the AOT list in addition to [AotCatalog]. */
+    var aotCustomPackages: Set<String>
+        get() = prefs.getStringSet(KEY_AOT_CUSTOM_PACKAGES, null).orEmpty()
+            .filterTo(sortedSetOf()) { AotPackage.isValidPackageName(it) && !AotCatalog.isCatalogPackage(it) }
+        set(value) = prefs.edit {
+            putStringSet(
+                KEY_AOT_CUSTOM_PACKAGES,
+                value.filterTo(HashSet()) {
+                    AotPackage.isValidPackageName(it) && !AotCatalog.isCatalogPackage(it)
+                }
+            )
+        }
+
     /** True when the background job has any work: ADB is on and at least one auto action is. */
     val autoWorkEnabled: Boolean
         get() = adbEnabled && (autoApplyCodecFix || autoAotCompile)
@@ -87,6 +100,7 @@ class CodecFixPrefs(context: Context) {
         private const val KEY_ADB_PORT = "adb_port"
         private const val KEY_AUTO_APPLY = "auto_apply"
         private const val KEY_AUTO_AOT_COMPILE = "auto_aot_compile"
+        private const val KEY_AOT_CUSTOM_PACKAGES = "aot_custom_packages"
         private const val KEY_AUTO_APPLY_DELAY_SECONDS = "auto_apply_delay_seconds"
         private const val KEY_SKIP_COMPATIBILITY_CHECK = "skip_compatibility_check"
         private const val KEY_ERROR_NOTIFICATIONS_ENABLED = "error_notifications_enabled"

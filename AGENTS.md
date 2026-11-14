@@ -28,8 +28,8 @@ connects to the device's local `adbd` and provides two tools:
 - Codec Fix: stages media codec configuration files, bind-mounts selected files over
   `/vendor/etc`, and restarts media services. Treat every apply-path change as a safety-critical
   change: a partial configuration can break media playback until reboot.
-- AOT: compiles a fixed catalog of Atlas and companion apps with the ART `speed` filter through
-  `cmd package compile`. It needs no root and must never touch `/vendor`.
+- AOT: compiles a fixed catalog of Atlas and companion apps, plus apps the user selects from the
+  installed-app list, with the ART `speed` filter through `cmd package compile`. It needs no root and must never touch `/vendor`.
 
 ## Required safety invariants
 
@@ -63,6 +63,8 @@ connects to the device's local `adbd` and provides two tools:
 - `app/src/main/java/com/mmwtl/atlascodecfix/`: Android/Kotlin application code.
 - `Aot*.kt`: AOT catalog, `dexopt` status parser and compile repository. AOT success requires a
   zero exit code and a re-read `speed` filter; only add packages to `AotCatalog` with tests.
+  User-selected packages are stored by validated package name in `CodecFixPrefs`, never include
+  catalog packages, and are merged by `AotCatalog.withCustom` with AtlasTools kept last.
 - `scripts/emulator-telnet-shell.sh`: emulator-only localhost root shell for exercising Telnet
   mode; it must keep refusing non-emulator devices.
 - `hevc/preflight.sh`: compatibility and device guard.

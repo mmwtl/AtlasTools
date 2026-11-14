@@ -7,29 +7,37 @@ import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 
 /**
- * Reads and changes the ART compiler filter of [AotCatalog] applications. Compilation runs in the
+ * Reads and changes the ART compiler filter of [AotCatalog] applications and the user's own
+ * selection. [packages] is read at the start of every sequence, so selection changes apply to
+ * the next status check or compile. Compilation runs in the
  * package manager (`cmd package compile`), so it needs neither root nor any change under
  * `/vendor`. All sequences share [DeviceOperationLock] with the codec profile transaction.
  */
 class AotCompileRepository(
     private val adb: AdbCommandExecutor,
-    private val packages: List<AotPackage> = AotCatalog.PACKAGES,
+    private val packages: () -> List<AotPackage> = { AotCatalog.PACKAGES },
     private val isDebuggable: (String) -> Boolean = { false }
 ) {
+    constructor(
+        adb: AdbCommandExecutor,
+        packages: List<AotPackage>,
+        isDebuggable: (String) -> Boolean = { false }
+    ) : this(adb, { packages }, isDebuggable)
+
     fun interface ProgressListener {
         suspend fun onCompiling(pkg: AotPackage, index: Int, total: Int)
     }
 
     suspend fun queryStatus(): AotStatusResult = withContext(Dispatchers.IO) {
-        DeviceOperationLock.mutex.withLock { queryStatusLocked(packages) }
+        DeviceOperationLock.mutex.withLock { queryStatusLocked(packages()) }
     }
 
-    /** Compiles every installed catalog package that is not yet compiled with `speed`. */
+    /** Compiles every installed listed package that is not yet compiled with `speed`. */
     suspend fun compileOutdated(
         progress: ProgressListener = ProgressListener { _, _, _ -> }
     ): AotCompileResult = withContext(Dispatchers.IO) {
         DeviceOperationLock.mutex.withLock {
-            val before = queryStatusLocked(packages)
+            val before = queryStatusLocked(packages())
             if (!before.commandSuccess) {
                 return@withLock AotCompileResult(statuses = before.packages, statusOutput = before.output)
             }
@@ -45,14 +53,17 @@ class AotCompileRepository(
         pkg: AotPackage,
         progress: ProgressListener = ProgressListener { _, _, _ -> }
     ): AotCompileResult = withContext(Dispatchers.IO) {
-        require(pkg in packages) { "Package is not in the AOT catalog: ${pkg.packageName}" }
         DeviceOperationLock.mutex.withLock {
-            val before = queryStatusLocked(packages)
+            val listed = packages()
+            val target = requireNotNull(listed.firstOrNull { it.packageName == pkg.packageName }) {
+                "Package is not in the AOT list: ${pkg.packageName}"
+            }
+            val before = queryStatusLocked(listed)
             if (!before.commandSuccess) {
                 return@withLock AotCompileResult(statuses = before.packages, statusOutput = before.output)
             }
-            val compilable = before.packages.first { it.pkg == pkg }.state !in NOT_COMPILABLE
-            compileLocked(before, if (compilable) listOf(pkg) else emptyList(), progress)
+            val compilable = before.packages.first { it.pkg == target }.state !in NOT_COMPILABLE
+            compileLocked(before, if (compilable) listOf(target) else emptyList(), progress)
         }
     }
 

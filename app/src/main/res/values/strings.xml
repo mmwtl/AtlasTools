@@ -148,7 +148,17 @@
     <string name="codec_decoder">decoder</string>
 
     <string name="section_aot">AOT-компиляция (speed)</string>
-    <string name="aot_description">Заранее компилирует приложения Atlas целиком с профилем speed: быстрее запуск и отклик, но больше занятого места. После обновления приложения или прошивки компиляцию нужно повторить.</string>
+    <string name="aot_description">Заранее компилирует приложения Atlas и выбранные вами приложения целиком с профилем speed: быстрее запуск и отклик, но больше занятого места. После обновления приложения или прошивки компиляцию нужно повторить.</string>
+    <string name="action_aot_pick_apps">Мои приложения</string>
+    <string name="aot_custom_label">Выбрано вами</string>
+    <string name="aot_picker_title">Мои приложения для AOT</string>
+    <string name="aot_picker_search">Поиск по названию или пакету</string>
+    <string name="aot_picker_show_system">Показывать системные</string>
+    <string name="aot_picker_loading">Загружаю список приложений</string>
+    <string name="aot_picker_empty">Ничего не найдено</string>
+    <string name="aot_picker_selected">Выбрано: %1$d</string>
+    <string name="aot_selection_saved">Список AOT обновлён, своих приложений: %1$d</string>
+    <string name="action_save">Сохранить</string>
     <string name="action_aot_compile_outdated">Скомпилировать все</string>
     <string name="action_aot_compile">Скомпилировать</string>
     <string name="aot_state_unchecked">Не проверено</string>
@@ -166,7 +176,7 @@
     <string name="aot_status_check_failed">Не удалось проверить состояние компиляции</string>
     <string name="error_title_aot">AOT-компиляция</string>
     <string name="auto_aot">AOT после загрузки</string>
-    <string name="auto_aot_description">После загрузки проверяет приложения Atlas и перекомпилирует speed те, что его потеряли</string>
+    <string name="auto_aot_description">После загрузки проверяет приложения Atlas и выбранные вами и перекомпилирует speed те, что его потеряли</string>
     <string name="auto_aot_enabled">AOT-проверка после загрузки включена</string>
     <string name="auto_aot_disabled">AOT-проверка после загрузки выключена</string>
     <string name="auto_aot_failed">AOT-компиляция после загрузки не выполнена: %1$s</string>

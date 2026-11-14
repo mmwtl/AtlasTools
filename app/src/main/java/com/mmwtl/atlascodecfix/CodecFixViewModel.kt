@@ -303,7 +303,9 @@ class CodecFixViewModel(
                     .ifBlank { text(R.string.aot_status_check_failed) }
             }
             if (!result.commandSuccess) notifyError(text(R.string.error_title_aot), status)
-            _state.update { it.copy(aotStatuses = result.packages, status = status) }
+            _state.update {
+                it.copy(aotStatuses = result.packages, aotPackages = app.aotPackages(), status = status)
+            }
         }
     }
 
@@ -352,6 +354,44 @@ class CodecFixViewModel(
         _state.update { it.copy(autoAotCompile = enabled, status = status) }
     }
 
+    fun openAotPicker() {
+        if (_state.value.aotPicker != null) return
+        _state.update { it.copy(aotPicker = AotPickerState(selected = app.prefs.aotCustomPackages)) }
+        viewModelScope.launch {
+            val apps = runCatching { withContext(Dispatchers.IO) { app.installedApps() } }
+                .getOrDefault(emptyList())
+            _state.update { state -> state.copy(aotPicker = state.aotPicker?.copy(apps = apps)) }
+        }
+    }
+
+    fun setAotPickerQuery(query: String) = updateAotPicker { it.copy(query = query.take(MAX_QUERY_LENGTH)) }
+
+    fun setAotPickerShowSystem(show: Boolean) = updateAotPicker { it.copy(showSystem = show) }
+
+    fun toggleAotPickerApp(packageName: String) = updateAotPicker {
+        it.copy(selected = if (packageName in it.selected) it.selected - packageName else it.selected + packageName)
+    }
+
+    fun dismissAotPicker() = _state.update { it.copy(aotPicker = null) }
+
+    fun confirmAotPicker() {
+        val picker = _state.value.aotPicker ?: return
+        val changed = picker.selected != app.prefs.aotCustomPackages
+        app.prefs.aotCustomPackages = picker.selected
+        _state.update {
+            it.copy(
+                aotPicker = null,
+                aotPackages = app.aotPackages(),
+                status = if (changed) text(R.string.aot_selection_saved, picker.selected.size) else it.status
+            )
+        }
+        val current = _state.value
+        if (changed && current.adbEnabled && !current.isBusy) refreshAotStatus()
+    }
+
+    private fun updateAotPicker(transform: (AotPickerState) -> AotPickerState) =
+        _state.update { state -> state.copy(aotPicker = state.aotPicker?.let(transform)) }
+
     private fun aotProgressListener() = AotCompileRepository.ProgressListener { pkg, index, total ->
         _state.update {
             it.copy(status = text(R.string.aot_compiling, pkg.title, index, total))
@@ -378,7 +418,9 @@ class CodecFixViewModel(
             }.joinToString("\n").takeLast(STATUS_TEXT_LIMIT)
         }
         if (!result.success) notifyError(text(R.string.error_title_aot), status)
-        _state.update { it.copy(aotStatuses = result.statuses, status = status) }
+        _state.update {
+            it.copy(aotStatuses = result.statuses, aotPackages = app.aotPackages(), status = status)
+        }
     }
 
     private fun aotSummary(statuses: List<AotPackageStatus>): String {
@@ -581,6 +623,7 @@ class CodecFixViewModel(
             skipCompatibilityCheck = prefs.skipCompatibilityCheck,
             errorNotificationsEnabled = prefs.errorNotificationsEnabled,
             autoAotCompile = prefs.autoAotCompile,
+            aotPackages = app.aotPackages(),
             selectedVariant = prefs.selectedVariant
         )
     }
@@ -735,6 +778,7 @@ class CodecFixViewModel(
         private const val PREFLIGHT_REPORT_LIMIT = 2_000
         private const val DIAGNOSTICS_REPORT_LIMIT = 6_000
         private const val STATUS_TEXT_LIMIT = 220
+        private const val MAX_QUERY_LENGTH = 100
     }
 }
 
@@ -763,13 +807,28 @@ data class CodecFixScreenState(
     val confirmation: ApplyConfirmation? = null,
     val autoAotCompile: Boolean = false,
     /** `null` until the AOT state has been read from the device. */
-    val aotStatuses: List<AotPackageStatus>? = null
+    val aotStatuses: List<AotPackageStatus>? = null,
+    /** The catalog plus the user's own selection, in compile order. */
+    val aotPackages: List<AotPackage> = AotCatalog.PACKAGES,
+    /** Non-null while the AOT app picker is open. */
+    val aotPicker: AotPickerState? = null
 ) {
     val effectiveAutoApplyVariant: HevcCodecFixVariant
         get() = selectedVariant
 
     val isAutoApplyDelayValid: Boolean
         get() = AutoApplyDelay.parse(autoApplyDelayText) != null
+}
+
+data class AotPickerState(
+    /** `null` while the installed app list is loading. */
+    val apps: List<InstalledApp>? = null,
+    val selected: Set<String> = emptySet(),
+    val query: String = "",
+    val showSystem: Boolean = false
+) {
+    val entries: List<InstalledApp>?
+        get() = apps?.let { AotAppPicker.entries(it, selected, showSystem, query) }
 }
 
 data class ApplyConfirmation(

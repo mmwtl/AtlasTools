@@ -31,7 +31,10 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
@@ -40,6 +43,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.HorizontalDivider
@@ -65,6 +69,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.liveRegion
@@ -121,6 +126,14 @@ class MainActivity : ComponentActivity() {
                     onAotRefresh = viewModel::refreshAotStatus,
                     onAotCompileOutdated = viewModel::compileOutdatedAot,
                     onAotCompilePackage = viewModel::compileAotPackage,
+                    aotPickerEvents = AotPickerEvents(
+                        onOpen = viewModel::openAotPicker,
+                        onQueryChange = viewModel::setAotPickerQuery,
+                        onShowSystemChange = viewModel::setAotPickerShowSystem,
+                        onToggle = viewModel::toggleAotPickerApp,
+                        onConfirm = viewModel::confirmAotPicker,
+                        onDismiss = viewModel::dismissAotPicker
+                    ),
                     onAutoAotCompileChange = viewModel::setAutoAotCompile,
                     onConfirmApply = viewModel::confirmApply,
                     onDismissConfirmation = viewModel::dismissApplyConfirmation
@@ -196,6 +209,7 @@ private fun CodecFixScreen(
     onAotRefresh: () -> Unit,
     onAotCompileOutdated: () -> Unit,
     onAotCompilePackage: (AotPackage) -> Unit,
+    aotPickerEvents: AotPickerEvents,
     onAutoAotCompileChange: (Boolean) -> Unit,
     onConfirmApply: () -> Unit,
     onDismissConfirmation: () -> Unit
@@ -230,6 +244,8 @@ private fun CodecFixScreen(
             shape = RoundedCornerShape(8.dp)
         )
     }
+
+    state.aotPicker?.let { picker -> AotPickerDialog(picker, aotPickerEvents) }
 
     var selectedTab by rememberSaveable { mutableStateOf(CodecFixTab.PROFILE) }
 
@@ -292,6 +308,7 @@ private fun CodecFixScreen(
                         onRefresh = onAotRefresh,
                         onCompileOutdated = onAotCompileOutdated,
                         onCompilePackage = onAotCompilePackage,
+                        onPickApps = aotPickerEvents.onOpen,
                         onOpenConnection = { selectedTab = CodecFixTab.CONNECTION }
                     )
                     CodecFixTab.CONNECTION -> ConnectionTab(
@@ -406,10 +423,11 @@ private fun AotTab(
     onRefresh: () -> Unit,
     onCompileOutdated: () -> Unit,
     onCompilePackage: (AotPackage) -> Unit,
+    onPickApps: () -> Unit,
     onOpenConnection: () -> Unit
 ) {
     LaunchedEffect(Unit) { onOpened() }
-    val statuses = state.aotStatuses?.associateBy { it.pkg }.orEmpty()
+    val statuses = state.aotStatuses?.associateBy { it.pkg.packageName }.orEmpty()
     val actionsEnabled = state.adbEnabled && !state.isBusy
 
     Section(title = stringResource(R.string.section_aot)) {
@@ -446,13 +464,20 @@ private fun AotTab(
             ) {
                 Text(stringResource(R.string.action_check))
             }
+            OutlinedButton(
+                enabled = !state.isBusy,
+                shape = RoundedCornerShape(8.dp),
+                onClick = onPickApps
+            ) {
+                Text(stringResource(R.string.action_aot_pick_apps))
+            }
         }
 
-        AotCatalog.PACKAGES.forEach { pkg ->
+        state.aotPackages.forEach { pkg ->
             HorizontalDivider()
             AotPackageRow(
                 pkg = pkg,
-                status = statuses[pkg],
+                status = statuses[pkg.packageName],
                 enabled = actionsEnabled,
                 onCompile = { onCompilePackage(pkg) }
             )
@@ -493,7 +518,11 @@ private fun AotPackageRow(
         Column(modifier = Modifier.weight(1f)) {
             Text(pkg.title, fontWeight = FontWeight.Medium)
             Text(
-                text = pkg.packageName,
+                text = if (AotCatalog.isCatalogPackage(pkg.packageName)) {
+                    pkg.packageName
+                } else {
+                    stringResource(R.string.aot_custom_label) + " · " + pkg.packageName
+                },
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 fontSize = 12.sp
             )
@@ -506,6 +535,118 @@ private fun AotPackageRow(
             onClick = onCompile
         ) {
             Text(stringResource(R.string.action_aot_compile))
+        }
+    }
+}
+
+class AotPickerEvents(
+    val onOpen: () -> Unit,
+    val onQueryChange: (String) -> Unit,
+    val onShowSystemChange: (Boolean) -> Unit,
+    val onToggle: (String) -> Unit,
+    val onConfirm: () -> Unit,
+    val onDismiss: () -> Unit
+)
+
+@Composable
+private fun AotPickerDialog(picker: AotPickerState, events: AotPickerEvents) {
+    val entries = remember(picker) { picker.entries }
+    AlertDialog(
+        onDismissRequest = events.onDismiss,
+        title = { Text(stringResource(R.string.aot_picker_title)) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedTextField(
+                    modifier = Modifier.fillMaxWidth(),
+                    value = picker.query,
+                    onValueChange = events.onQueryChange,
+                    singleLine = true,
+                    label = { Text(stringResource(R.string.aot_picker_search)) }
+                )
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .toggleable(
+                            value = picker.showSystem,
+                            role = Role.Checkbox,
+                            onValueChange = events.onShowSystemChange
+                        ),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Checkbox(checked = picker.showSystem, onCheckedChange = null)
+                    Spacer(Modifier.width(8.dp))
+                    Text(
+                        modifier = Modifier.weight(1f),
+                        text = stringResource(R.string.aot_picker_show_system)
+                    )
+                    Text(
+                        text = stringResource(R.string.aot_picker_selected, picker.selected.size),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        fontSize = 13.sp
+                    )
+                }
+                HorizontalDivider()
+                when {
+                    entries == null -> Row(
+                        modifier = Modifier.fillMaxWidth().padding(vertical = 16.dp),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        CircularProgressIndicator(modifier = Modifier.size(24.dp))
+                        Text(stringResource(R.string.aot_picker_loading))
+                    }
+                    entries.isEmpty() -> Text(
+                        modifier = Modifier.padding(vertical = 16.dp),
+                        text = stringResource(R.string.aot_picker_empty),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    else -> LazyColumn(modifier = Modifier.fillMaxWidth().heightIn(max = 360.dp)) {
+                        items(entries, key = InstalledApp::packageName) { app ->
+                            AotPickerRow(
+                                app = app,
+                                checked = app.packageName in picker.selected,
+                                onToggle = { events.onToggle(app.packageName) }
+                            )
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = events.onConfirm) {
+                Text(stringResource(R.string.action_save))
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = events.onDismiss) {
+                Text(stringResource(R.string.action_cancel))
+            }
+        },
+        containerColor = MaterialTheme.colorScheme.surface,
+        shape = RoundedCornerShape(8.dp)
+    )
+}
+
+@Composable
+private fun AotPickerRow(app: InstalledApp, checked: Boolean, onToggle: () -> Unit) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .toggleable(value = checked, role = Role.Checkbox, onValueChange = { onToggle() })
+            .padding(vertical = 6.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Checkbox(checked = checked, onCheckedChange = null)
+        Spacer(Modifier.width(8.dp))
+        Column(modifier = Modifier.weight(1f)) {
+            Text(app.label, fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(
+                text = app.packageName,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                fontSize = 12.sp,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
         }
     }
 }
