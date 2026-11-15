@@ -20,12 +20,6 @@
         <package android:name="com.mmwtl.atlasmediaapi" />
         <package android:name="com.mmwtl.atlasdim" />
         <package android:name="com.mmwtl.atlasterminal" />
-        <package android:name="com.salat.gbinder" />
-        <package android:name="com.salat.gsplit" />
-        <package android:name="com.andrerinas.headunitrevived" />
-        <package android:name="com.andrerinas.headunitrevived.geely" />
-        <package android:name="com.geely.online.service" />
-        <package android:name="com.salat.gmediahud" />
     </queries>
 
     <application

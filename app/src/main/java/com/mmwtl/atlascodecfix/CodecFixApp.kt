@@ -22,6 +22,7 @@ class CodecFixApp : Application() {
     override fun onCreate() {
         super.onCreate()
         prefs = CodecFixPrefs(this)
+        migrateAotSelection()
         adbClient = AdbClient(this, prefs)
         codecFixRepository = HevcCodecFixRepository(this, adbClient)
         aotRepository = AotCompileRepository(
@@ -31,6 +32,14 @@ class CodecFixApp : Application() {
         )
         errorNotifier = ErrorNotifier(this, prefs)
         manualApplyNotifier = ManualApplyNotifier(this)
+    }
+
+    private fun migrateAotSelection() {
+        if (prefs.aotCatalogMigrated) return
+        prefs.aotCustomPackages = AotCatalog.migrateSelection(prefs.aotCustomPackages) {
+            applicationInfo(it) != null
+        }
+        prefs.aotCatalogMigrated = true
     }
 
     /** The catalog plus the user's own selection, labelled from the package manager. */

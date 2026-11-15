@@ -18,7 +18,7 @@ data class AotPackage(
 
 object AotCatalog {
     /**
-     * Fixed list of Atlas and companion applications. AtlasTools itself stays last, so a batch
+     * Fixed list of Atlas applications; every other app is added by the user. AtlasTools itself stays last, so a batch
      * finishes every other app before touching the running tool. `cmd package compile` does not
      * stop the running process; the new code is used from its next start.
      */
@@ -31,14 +31,22 @@ object AotCatalog {
         AotPackage("com.mmwtl.atlasmediaapi", "Atlas Media API"),
         AotPackage("com.mmwtl.atlasdim", "Atlas Dim"),
         AotPackage("com.mmwtl.atlasterminal", "Atlas Terminal"),
-        AotPackage("com.salat.gbinder", "GInputBridge (GIB)"),
-        AotPackage("com.salat.gsplit", "GSplit"),
-        AotPackage("com.andrerinas.headunitrevived", "Open Headunit"),
-        AotPackage("com.andrerinas.headunitrevived.geely", "Open Headunit Geely"),
-        AotPackage("com.geely.online.service", "GMediaProxy (GMP)"),
-        AotPackage("com.salat.gmediahud", "GMediaHud (GMH)"),
         AotPackage(BuildConfig.APPLICATION_ID, "Atlas Tools")
     )
+
+    /** Companion apps that were in the fixed list up to 1.6.0; migrated into the selection once. */
+    val FORMER_PACKAGES: List<String> = listOf(
+        "com.salat.gbinder",
+        "com.salat.gsplit",
+        "com.andrerinas.headunitrevived",
+        "com.andrerinas.headunitrevived.geely",
+        "com.geely.online.service",
+        "com.salat.gmediahud"
+    )
+
+    /** Adds the installed [FORMER_PACKAGES] to [selected] so an update keeps compiling them. */
+    fun migrateSelection(selected: Set<String>, isInstalled: (String) -> Boolean): Set<String> =
+        selected + FORMER_PACKAGES.filter { runCatching { isInstalled(it) }.getOrDefault(false) }
 
     private val CATALOG_NAMES: Set<String> = PACKAGES.mapTo(HashSet(), AotPackage::packageName)
 

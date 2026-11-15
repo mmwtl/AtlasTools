@@ -161,23 +161,15 @@ class AotDexoptStatusParserTest {
     }
 
     @Test
-    fun catalogContainsRequestedAppsWithoutDuplicatesAndSelfLast() {
+    fun catalogContainsOnlyAtlasAppsWithoutDuplicatesAndSelfLast() {
         val names = AotCatalog.PACKAGES.map(AotPackage::packageName)
 
         assertEquals(names.size, names.toSet().size)
+        assertTrue(names.contains("com.geely.atlaslauncher"))
         assertTrue(
-            names.containsAll(
-                listOf(
-                    "com.salat.gbinder",
-                    "com.salat.gsplit",
-                    "com.andrerinas.headunitrevived",
-                    "com.andrerinas.headunitrevived.geely",
-                    "com.geely.atlaslauncher",
-                    "com.geely.online.service",
-                    "com.salat.gmediahud"
-                )
-            )
+            names.all { it == "com.geely.atlaslauncher" || it.startsWith("com.mmwtl.atlas") }
         )
+        assertTrue(AotCatalog.FORMER_PACKAGES.none(AotCatalog::isCatalogPackage))
         assertEquals("com.mmwtl.atlascodecfix", names.last())
     }
 

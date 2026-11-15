@@ -57,6 +57,10 @@ class CodecFixPrefs(context: Context) {
             )
         }
 
+    internal var aotCatalogMigrated: Boolean
+        get() = prefs.getBoolean(KEY_AOT_CATALOG_MIGRATED, false)
+        set(value) = prefs.edit { putBoolean(KEY_AOT_CATALOG_MIGRATED, value) }
+
     /** True when the background job has any work: ADB is on and at least one auto action is. */
     val autoWorkEnabled: Boolean
         get() = adbEnabled && (autoApplyCodecFix || autoAotCompile)
@@ -101,6 +105,7 @@ class CodecFixPrefs(context: Context) {
         private const val KEY_AUTO_APPLY = "auto_apply"
         private const val KEY_AUTO_AOT_COMPILE = "auto_aot_compile"
         private const val KEY_AOT_CUSTOM_PACKAGES = "aot_custom_packages"
+        private const val KEY_AOT_CATALOG_MIGRATED = "aot_catalog_migrated"
         private const val KEY_AUTO_APPLY_DELAY_SECONDS = "auto_apply_delay_seconds"
         private const val KEY_SKIP_COMPATIBILITY_CHECK = "skip_compatibility_check"
         private const val KEY_ERROR_NOTIFICATIONS_ENABLED = "error_notifications_enabled"

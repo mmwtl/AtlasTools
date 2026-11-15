@@ -93,6 +93,18 @@ class AotCustomSelectionTest {
     }
 
     @Test
+    fun migrationAddsOnlyInstalledFormerCatalogAppsAndKeepsTheSelection() {
+        val installed = setOf("com.salat.gsplit", "com.geely.online.service")
+
+        val migrated = AotCatalog.migrateSelection(setOf("org.videolan.vlc")) { name ->
+            if (name == "com.salat.gmediahud") error("package manager unavailable")
+            name in installed
+        }
+
+        assertEquals(setOf("org.videolan.vlc", "com.salat.gsplit", "com.geely.online.service"), migrated)
+    }
+
+    @Test
     fun packageNameValidationRejectsShellMetacharacters() {
         assertTrue(AotPackage.isValidPackageName("org.videolan.vlc"))
         assertFalse(AotPackage.isValidPackageName("org.vlc; reboot"))
