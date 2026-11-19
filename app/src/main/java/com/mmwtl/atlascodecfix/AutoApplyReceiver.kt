@@ -12,13 +12,16 @@ class AutoApplyReceiver : BroadcastReceiver() {
             return
         }
 
+        val app = context.applicationContext as CodecFixApp
+        app.btFallbackMonitor.syncRegistration()
+
         val scheduled = if (intent.action == Intent.ACTION_USER_UNLOCKED) {
             AutoApplyScheduler.ensureScheduled(context)
         } else {
             AutoApplyScheduler.sync(context, resetRetries = true)
         }
-        if (!scheduled) {
-            val app = context.applicationContext as CodecFixApp
+        val btScheduled = BtFallbackScheduler.onBootEvent(context, intent.action)
+        if (!scheduled || !btScheduled) {
             app.errorNotifier.notify(
                 context.getString(R.string.app_name),
                 context.getString(R.string.auto_apply_schedule_failed)

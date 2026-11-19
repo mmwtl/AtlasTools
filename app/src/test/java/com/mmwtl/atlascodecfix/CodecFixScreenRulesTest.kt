@@ -11,6 +11,7 @@ class CodecFixScreenRulesTest {
             listOf(
                 CodecFixTab.PROFILE,
                 CodecFixTab.AOT,
+                CodecFixTab.BLUETOOTH,
                 CodecFixTab.CONNECTION,
                 CodecFixTab.AUTOSTART,
                 CodecFixTab.DIAGNOSTICS

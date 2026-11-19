@@ -4,6 +4,9 @@ import android.app.Application
 import android.content.pm.ApplicationInfo
 import android.content.pm.PackageManager
 import android.os.Build
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 
 class CodecFixApp : Application() {
     lateinit var prefs: CodecFixPrefs
@@ -14,10 +17,21 @@ class CodecFixApp : Application() {
         private set
     lateinit var aotRepository: AotCompileRepository
         private set
+    lateinit var btFallbackRepository: BtFallbackRepository
+        private set
+    val btFallbackLoopGuard = BtFallbackLoopGuard()
+    lateinit var btFallbackMonitor: BtFallbackMonitor
+        private set
     lateinit var errorNotifier: ErrorNotifier
         private set
     lateinit var manualApplyNotifier: ManualApplyNotifier
         private set
+
+    private val _btFallbackStatus = MutableStateFlow<BtFallbackStatus?>(null)
+    val btFallbackStatus: StateFlow<BtFallbackStatus?> = _btFallbackStatus.asStateFlow()
+
+    private val _btFallbackLastRun = MutableStateFlow<BtFallbackLastRun?>(null)
+    val btFallbackLastRun: StateFlow<BtFallbackLastRun?> = _btFallbackLastRun.asStateFlow()
 
     override fun onCreate() {
         super.onCreate()
@@ -30,8 +44,45 @@ class CodecFixApp : Application() {
             packages = ::aotPackages,
             isDebuggable = ::isDebuggablePackage
         )
+        btFallbackRepository = BtFallbackRepository(adbClient)
+        btFallbackMonitor = BtFallbackMonitor(this)
         errorNotifier = ErrorNotifier(this, prefs)
         manualApplyNotifier = ManualApplyNotifier(this)
+        _btFallbackLastRun.value = prefs.btFallbackLastRun
+        btFallbackMonitor.syncRegistration()
+    }
+
+    fun updateBtFallbackStatus(status: BtFallbackStatus) {
+        _btFallbackStatus.value = status
+    }
+
+    fun recordBtFallbackResult(result: BtFallbackRunResult) {
+        result.latestStatus?.let { _btFallbackStatus.value = it }
+        val detail = when (result.outcome) {
+            BtFallbackOutcome.APPLIED -> buildList {
+                result.beforeStatus?.carplayDisconnectAddress?.let { mac ->
+                    add(getString(R.string.bt_fallback_detail_cleared, mac))
+                }
+                if (result.reorderedDeviceAddress != null) {
+                    add(getString(R.string.bt_fallback_detail_reordered))
+                }
+            }.joinToString(" · ")
+            BtFallbackOutcome.FAILED -> result.output.trim().takeLast(180)
+            else -> ""
+        }
+        recordBtFallbackLastRun(
+            BtFallbackLastRun(
+                timestampMs = result.timestampMs.takeIf { it > 0L } ?: System.currentTimeMillis(),
+                trigger = result.trigger,
+                outcome = result.outcome,
+                detail = detail
+            )
+        )
+    }
+
+    fun recordBtFallbackLastRun(lastRun: BtFallbackLastRun) {
+        prefs.btFallbackLastRun = lastRun
+        _btFallbackLastRun.value = lastRun
     }
 
     private fun migrateAotSelection() {

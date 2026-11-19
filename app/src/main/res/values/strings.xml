@@ -13,6 +13,7 @@
 
     <string name="tab_profile">Кодеки</string>
     <string name="tab_aot">AOT</string>
+    <string name="tab_bluetooth">BT</string>
     <string name="tab_connection">Подключение</string>
     <string name="tab_autostart">Автозапуск</string>
     <string name="tab_diagnostics">Диагностика</string>
@@ -93,7 +94,7 @@
     <string name="auto_apply_stopped">Автоприменение остановлено после %1$d попыток: %2$s</string>
     <string name="auto_apply_schedule_failed">Не удалось запланировать автоприменение</string>
     <string name="auto_apply_accessibility_label">Надёжный автозапуск Atlas Tools</string>
-    <string name="auto_apply_accessibility_description">Запускает проверку выбранного codec-профиля и AOT-компиляции после загрузки и пробуждения ГУ. Не читает содержимое окон и не выполняет жесты.</string>
+    <string name="auto_apply_accessibility_description">Запускает проверку выбранного codec-профиля, AOT-компиляции и отслеживает пробуждение ГУ и статус CarPlay для автообхода Bluetooth. Не читает содержимое окон и не выполняет жесты.</string>
     <string name="auto_apply_accessibility_hint">Резервный запуск: включите «Надёжный автозапуск Atlas Tools» в спецвозможностях.</string>
     <string name="open_accessibility_settings">Открыть специальные возможности</string>
     <string name="no_accessibility_settings">В прошивке нет системного экрана специальных возможностей</string>
@@ -180,6 +181,62 @@
     <string name="auto_aot_enabled">AOT-проверка после загрузки включена</string>
     <string name="auto_aot_disabled">AOT-проверка после загрузки выключена</string>
     <string name="auto_aot_failed">AOT-компиляция после загрузки не выполнена: %1$s</string>
+
+    <string name="section_bt_fallback">Bluetooth после CarPlay</string>
+    <string name="bt_fallback_description">Обходит блокировку автоподключения Bluetooth на Geely Atlas (G636) после беспроводного CarPlay. Не мешает CarPlay, когда iPhone рядом: при загрузке, пробуждении или ошибке CarPlay сбрасывает застрявший key_carplay_disconnect_address, при необходимости сдвигает MAC CarPlay в конец key_device_address и перезапускает com.autolink.bluetoothservice.</string>
+    <string name="auto_bt_fallback">Автообход после CarPlay</string>
+    <string name="auto_bt_fallback_description">Срабатывает после загрузки, пробуждения (im_mode=6) и carplaystatus=0, если CarPlay не активен, Bluetooth включён и ничего не подключено</string>
+    <string name="auto_bt_fallback_accessibility_hint">Для отслеживания пробуждения и статуса CarPlay в фоне включите «Надёжный автозапуск Atlas Tools» в спецвозможностях.</string>
+    <string name="action_bt_fallback_run">Запустить обход</string>
+    <string name="section_bt_diagnostics">Диагностика Bluetooth и CarPlay</string>
+    <string name="bt_diag_unchecked">Не проверено</string>
+    <string name="bt_diag_empty">пусто</string>
+    <string name="bt_diag_carplay_disconnect_label">key_carplay_disconnect_address</string>
+    <string name="bt_diag_carplay_disconnect_clear">пусто (не заблокировано)</string>
+    <string name="bt_diag_carplay_disconnect_blocked">%1$s (блокирует автоподключение BT)</string>
+    <string name="bt_diag_device_address_label">key_device_address</string>
+    <string name="bt_diag_carplay_status_label">sys.autolink.carplay.status</string>
+    <string name="bt_diag_carplay_status_active">1 (CarPlay активен)</string>
+    <string name="bt_diag_carplay_status_inactive">0 (CarPlay не активен)</string>
+    <string name="bt_diag_bt_state_label">Состояние Bluetooth</string>
+    <string name="bt_diag_bt_adapter_on">Включён</string>
+    <string name="bt_diag_bt_adapter_off">Выключен</string>
+    <string name="bt_diag_bt_adapter_turning_on">Включается</string>
+    <string name="bt_diag_bt_adapter_turning_off">Выключается</string>
+    <string name="bt_diag_bt_adapter_unknown">Неизвестно</string>
+    <string name="bt_diag_bt_conn_disconnected">не подключено</string>
+    <string name="bt_diag_bt_conn_connecting">подключается</string>
+    <string name="bt_diag_bt_conn_connected">подключено</string>
+    <string name="bt_diag_bt_conn_disconnecting">отключается</string>
+    <string name="bt_diag_bt_conn_unknown">статус соединения неизвестен</string>
+    <string name="bt_diag_service_running">BluetoothService запущен</string>
+    <string name="bt_diag_service_stopped">BluetoothService не запущен</string>
+    <string name="bt_diag_is_connecting">автоподключение активно</string>
+    <string name="bt_diag_last_run_label">Последний запуск</string>
+    <string name="bt_diag_last_run_never">Ещё не выполнялся</string>
+    <string name="bt_fallback_checking">Проверяю состояние Bluetooth и CarPlay</string>
+    <string name="bt_fallback_running">Выполняю обход автоподключения Bluetooth</string>
+    <string name="bt_fallback_status_check_failed">Не удалось прочитать состояние Bluetooth</string>
+    <string name="bt_fallback_status_blocked">Автоподключение BT заблокировано MAC %1$s</string>
+    <string name="bt_fallback_status_clear">Блокировки CarPlay нет (%1$s)</string>
+    <string name="bt_fallback_auto_enabled">Автообход Bluetooth после CarPlay включён</string>
+    <string name="bt_fallback_auto_disabled">Автообход Bluetooth после CarPlay выключен</string>
+    <string name="bt_fallback_connect_failed">Не удалось подключиться к ADB для обхода Bluetooth</string>
+    <string name="bt_fallback_auto_stopped">Автообход Bluetooth остановлен после %1$d попыток: %2$s</string>
+    <string name="bt_fallback_detail_cleared">сброшен %1$s</string>
+    <string name="bt_fallback_detail_reordered">MAC CarPlay сдвинут в конец</string>
+    <string name="bt_fallback_trigger_manual">вручную</string>
+    <string name="bt_fallback_trigger_boot">загрузка</string>
+    <string name="bt_fallback_trigger_wakeup">пробуждение</string>
+    <string name="bt_fallback_trigger_carplay_disconnected">CarPlay=0</string>
+    <string name="bt_fallback_outcome_applied">Блокировка сброшена, BluetoothService перезапущен</string>
+    <string name="bt_fallback_outcome_skipped_carplay">Пропущено: CarPlay активен</string>
+    <string name="bt_fallback_outcome_skipped_bt_disabled">Пропущено: Bluetooth выключен</string>
+    <string name="bt_fallback_outcome_skipped_bt_connected">Пропущено: Bluetooth уже подключён или подключается</string>
+    <string name="bt_fallback_outcome_skipped_not_blocked">Пропущено: блокировки CarPlay нет</string>
+    <string name="bt_fallback_outcome_skipped_loop_guard">Пропущено: защита от повторного запуска</string>
+    <string name="bt_fallback_outcome_failed">Ошибка обхода автоподключения Bluetooth</string>
+    <string name="error_title_bt_fallback">Обход Bluetooth после CarPlay</string>
 
     <string name="experimental_warning_short">%1$s использует возможности других платформ</string>
     <string name="risk_confirmation_title">Подтвердите риск</string>

@@ -26,6 +26,16 @@ class CodecFixViewModel(
                 _state.update { it.copy(connectionState = connectionState) }
             }
         }
+        viewModelScope.launch {
+            app.btFallbackStatus.collect { btStatus ->
+                _state.update { it.copy(btStatus = btStatus) }
+            }
+        }
+        viewModelScope.launch {
+            app.btFallbackLastRun.collect { btLastRun ->
+                _state.update { it.copy(btLastRun = btLastRun) }
+            }
+        }
         if (app.prefs.adbEnabled) {
             launchOperation(text(R.string.adb_connecting)) {
                 val connected = app.adbClient.reconnect()
@@ -52,9 +62,12 @@ class CodecFixViewModel(
             if (app.prefs.autoWorkEnabled) {
                 AutoApplyScheduler.schedule(app, resetRetries = true)
             }
+            app.btFallbackMonitor.syncRegistration()
             connectAdb()
         } else {
             AutoApplyScheduler.cancel(app)
+            BtFallbackScheduler.cancel(app)
+            app.btFallbackMonitor.syncRegistration()
             disconnectAdb()
         }
     }
@@ -354,6 +367,106 @@ class CodecFixViewModel(
         _state.update { it.copy(autoAotCompile = enabled, status = status) }
     }
 
+    fun onBtTabOpened() {
+        val current = _state.value
+        if (current.btStatus == null && current.adbEnabled && !current.isBusy) {
+            refreshBtStatus()
+        }
+    }
+
+    fun refreshBtStatus() {
+        launchOperation(text(R.string.bt_fallback_checking)) {
+            if (!_state.value.adbEnabled) {
+                _state.update { it.copy(status = text(R.string.adb_disabled_message)) }
+                return@launchOperation
+            }
+            val result = app.btFallbackRepository.queryStatus()
+            app.updateBtFallbackStatus(result)
+            val status = if (result.commandSuccess) {
+                val blockedMac = result.carplayDisconnectAddress
+                if (blockedMac != null) {
+                    text(R.string.bt_fallback_status_blocked, blockedMac)
+                } else {
+                    text(R.string.bt_fallback_status_clear, btAdapterLabel(result.btAdapterState))
+                }
+            } else {
+                result.output.trim().takeLast(STATUS_TEXT_LIMIT)
+                    .ifBlank { text(R.string.bt_fallback_status_check_failed) }
+            }
+            if (!result.commandSuccess) {
+                notifyError(text(R.string.error_title_bt_fallback), status)
+            }
+            _state.update { it.copy(btStatus = result, status = status) }
+        }
+    }
+
+    fun runBtFallbackManual() {
+        launchOperation(text(R.string.bt_fallback_running)) {
+            if (!_state.value.adbEnabled) {
+                _state.update { it.copy(status = text(R.string.adb_disabled_message)) }
+                return@launchOperation
+            }
+            val result = app.btFallbackRepository.runFallback(BtFallbackTrigger.MANUAL)
+            app.recordBtFallbackResult(result)
+            val status = formatBtRunStatus(result)
+            if (result.outcome == BtFallbackOutcome.FAILED) {
+                notifyError(text(R.string.error_title_bt_fallback), status)
+            }
+            _state.update {
+                it.copy(
+                    btStatus = result.latestStatus ?: it.btStatus,
+                    btLastRun = app.btFallbackLastRun.value,
+                    status = status
+                )
+            }
+        }
+    }
+
+    fun setAutoBtFallback(enabled: Boolean) {
+        if (_state.value.isBusy) return
+        if (enabled && !_state.value.adbEnabled) {
+            _state.update {
+                it.copy(autoBtFallback = false, status = text(R.string.enable_adb_first))
+            }
+            return
+        }
+        app.prefs.autoBtFallback = enabled
+        app.prefs.btFallbackRetryCount = 0
+        if (!enabled) {
+            BtFallbackScheduler.cancel(app)
+            app.btFallbackLoopGuard.resetForDisable()
+        }
+        app.btFallbackMonitor.syncRegistration()
+        val status = text(
+            if (enabled) R.string.bt_fallback_auto_enabled else R.string.bt_fallback_auto_disabled
+        )
+        _state.update { it.copy(autoBtFallback = enabled, status = status) }
+    }
+
+    private fun btAdapterLabel(state: BtAdapterState): String = when (state) {
+        BtAdapterState.ON -> text(R.string.bt_diag_bt_adapter_on)
+        BtAdapterState.OFF -> text(R.string.bt_diag_bt_adapter_off)
+        BtAdapterState.TURNING_ON -> text(R.string.bt_diag_bt_adapter_turning_on)
+        BtAdapterState.TURNING_OFF -> text(R.string.bt_diag_bt_adapter_turning_off)
+        BtAdapterState.UNKNOWN -> text(R.string.bt_diag_bt_adapter_unknown)
+    }
+
+    private fun formatBtRunStatus(result: BtFallbackRunResult): String = when (result.outcome) {
+        BtFallbackOutcome.APPLIED -> buildList {
+            add(text(R.string.bt_fallback_outcome_applied))
+            if (result.reorderedDeviceAddress != null) {
+                add(text(R.string.bt_fallback_detail_reordered))
+            }
+        }.joinToString(" · ")
+        BtFallbackOutcome.SKIPPED_CARPLAY_ACTIVE -> text(R.string.bt_fallback_outcome_skipped_carplay)
+        BtFallbackOutcome.SKIPPED_BT_DISABLED -> text(R.string.bt_fallback_outcome_skipped_bt_disabled)
+        BtFallbackOutcome.SKIPPED_BT_ALREADY_CONNECTED -> text(R.string.bt_fallback_outcome_skipped_bt_connected)
+        BtFallbackOutcome.SKIPPED_NOT_BLOCKED -> text(R.string.bt_fallback_outcome_skipped_not_blocked)
+        BtFallbackOutcome.SKIPPED_LOOP_GUARD -> text(R.string.bt_fallback_outcome_skipped_loop_guard)
+        BtFallbackOutcome.FAILED -> result.output.trim().takeLast(STATUS_TEXT_LIMIT)
+            .ifBlank { text(R.string.bt_fallback_outcome_failed) }
+    }
+
     fun openAotPicker() {
         if (_state.value.aotPicker != null) return
         _state.update { it.copy(aotPicker = AotPickerState(selected = app.prefs.aotCustomPackages)) }
@@ -624,6 +737,9 @@ class CodecFixViewModel(
             errorNotificationsEnabled = prefs.errorNotificationsEnabled,
             autoAotCompile = prefs.autoAotCompile,
             aotPackages = app.aotPackages(),
+            autoBtFallback = prefs.autoBtFallback,
+            btStatus = app.btFallbackStatus.value,
+            btLastRun = app.btFallbackLastRun.value,
             selectedVariant = prefs.selectedVariant
         )
     }
@@ -811,7 +927,11 @@ data class CodecFixScreenState(
     /** The catalog plus the user's own selection, in compile order. */
     val aotPackages: List<AotPackage> = AotCatalog.PACKAGES,
     /** Non-null while the AOT app picker is open. */
-    val aotPicker: AotPickerState? = null
+    val aotPicker: AotPickerState? = null,
+    val autoBtFallback: Boolean = false,
+    /** `null` until the Bluetooth / CarPlay state has been read from the device. */
+    val btStatus: BtFallbackStatus? = null,
+    val btLastRun: BtFallbackLastRun? = null
 ) {
     val effectiveAutoApplyVariant: HevcCodecFixVariant
         get() = selectedVariant

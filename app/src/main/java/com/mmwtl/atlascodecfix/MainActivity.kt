@@ -80,6 +80,9 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.res.stringResource
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 class MainActivity : ComponentActivity() {
     private val viewModel: CodecFixViewModel by viewModels {
@@ -135,6 +138,10 @@ class MainActivity : ComponentActivity() {
                         onDismiss = viewModel::dismissAotPicker
                     ),
                     onAutoAotCompileChange = viewModel::setAutoAotCompile,
+                    onBtTabOpened = viewModel::onBtTabOpened,
+                    onBtRefresh = viewModel::refreshBtStatus,
+                    onBtRunManual = viewModel::runBtFallbackManual,
+                    onAutoBtFallbackChange = viewModel::setAutoBtFallback,
                     onConfirmApply = viewModel::confirmApply,
                     onDismissConfirmation = viewModel::dismissApplyConfirmation
                 )
@@ -211,6 +218,10 @@ private fun CodecFixScreen(
     onAotCompilePackage: (AotPackage) -> Unit,
     aotPickerEvents: AotPickerEvents,
     onAutoAotCompileChange: (Boolean) -> Unit,
+    onBtTabOpened: () -> Unit,
+    onBtRefresh: () -> Unit,
+    onBtRunManual: () -> Unit,
+    onAutoBtFallbackChange: (Boolean) -> Unit,
     onConfirmApply: () -> Unit,
     onDismissConfirmation: () -> Unit
 ) {
@@ -311,6 +322,15 @@ private fun CodecFixScreen(
                         onPickApps = aotPickerEvents.onOpen,
                         onOpenConnection = { selectedTab = CodecFixTab.CONNECTION }
                     )
+                    CodecFixTab.BLUETOOTH -> BluetoothTab(
+                        state = state,
+                        onOpened = onBtTabOpened,
+                        onRefresh = onBtRefresh,
+                        onRunManual = onBtRunManual,
+                        onAutoBtFallbackChange = onAutoBtFallbackChange,
+                        onOpenAccessibilitySettings = onOpenAccessibilitySettings,
+                        onOpenConnection = { selectedTab = CodecFixTab.CONNECTION }
+                    )
                     CodecFixTab.CONNECTION -> ConnectionTab(
                         state = state,
                         onAdbEnabledChange = onAdbEnabledChange,
@@ -325,6 +345,7 @@ private fun CodecFixScreen(
                         onAutoApplyCodecFixChange = onAutoApplyCodecFixChange,
                         onAutoApplyDelayChange = onAutoApplyDelayChange,
                         onAutoAotCompileChange = onAutoAotCompileChange,
+                        onAutoBtFallbackChange = onAutoBtFallbackChange,
                         onOpenAccessibilitySettings = onOpenAccessibilitySettings,
                         onErrorNotificationsChange = onErrorNotificationsChange
                     )
@@ -652,6 +673,243 @@ private fun AotPickerRow(app: InstalledApp, checked: Boolean, onToggle: () -> Un
 }
 
 @Composable
+private fun BluetoothTab(
+    state: CodecFixScreenState,
+    onOpened: () -> Unit,
+    onRefresh: () -> Unit,
+    onRunManual: () -> Unit,
+    onAutoBtFallbackChange: (Boolean) -> Unit,
+    onOpenAccessibilitySettings: () -> Unit,
+    onOpenConnection: () -> Unit
+) {
+    LaunchedEffect(Unit) { onOpened() }
+    val actionsEnabled = state.adbEnabled && !state.isBusy
+
+    Section(title = stringResource(R.string.section_bt_fallback)) {
+        Text(
+            text = stringResource(R.string.bt_fallback_description),
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+
+        CodecFixScreenRules.profileConnectionHint(state.adbEnabled, state.connectionState)
+            ?.let { hint ->
+                ConnectionHintRow(hint = hint, onOpenConnection = onOpenConnection)
+            }
+
+        SwitchSettingRow(
+            title = stringResource(R.string.auto_bt_fallback),
+            description = stringResource(R.string.auto_bt_fallback_description),
+            checked = state.autoBtFallback,
+            enabled = (state.adbEnabled || state.autoBtFallback) && !state.isBusy,
+            onCheckedChange = onAutoBtFallbackChange
+        )
+
+        Text(
+            text = stringResource(R.string.auto_bt_fallback_accessibility_hint),
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            fontSize = 13.sp
+        )
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            Button(
+                modifier = Modifier.weight(1f),
+                enabled = actionsEnabled,
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = MaterialTheme.colorScheme.primary,
+                    contentColor = MaterialTheme.colorScheme.onPrimary
+                ),
+                shape = RoundedCornerShape(8.dp),
+                onClick = onRunManual
+            ) {
+                Text(stringResource(R.string.action_bt_fallback_run), fontWeight = FontWeight.Bold)
+            }
+            OutlinedButton(
+                enabled = actionsEnabled,
+                shape = RoundedCornerShape(8.dp),
+                onClick = onRefresh
+            ) {
+                Text(stringResource(R.string.action_check))
+            }
+        }
+
+        OutlinedButton(
+            modifier = Modifier.fillMaxWidth(),
+            enabled = !state.isBusy,
+            shape = RoundedCornerShape(8.dp),
+            onClick = onOpenAccessibilitySettings
+        ) {
+            Text(stringResource(R.string.open_accessibility_settings))
+        }
+    }
+
+    Section(title = stringResource(R.string.section_bt_diagnostics)) {
+        val bt = state.btStatus
+        val unchecked = stringResource(R.string.bt_diag_unchecked)
+        val empty = stringResource(R.string.bt_diag_empty)
+
+        val disconnectText = when {
+            bt == null || !bt.commandSuccess -> unchecked
+            bt.carplayDisconnectAddress != null -> stringResource(
+                R.string.bt_diag_carplay_disconnect_blocked,
+                bt.carplayDisconnectAddress
+            )
+            else -> stringResource(R.string.bt_diag_carplay_disconnect_clear)
+        }
+        val disconnectColor = when {
+            bt != null && bt.commandSuccess && bt.isCarplayLockPresent ->
+                MaterialTheme.colorScheme.error
+            bt != null && bt.commandSuccess -> MaterialTheme.colorScheme.primary
+            else -> MaterialTheme.colorScheme.onSurfaceVariant
+        }
+        BtDiagnosticRow(
+            label = stringResource(R.string.bt_diag_carplay_disconnect_label),
+            value = disconnectText,
+            valueColor = disconnectColor
+        )
+        HorizontalDivider()
+
+        BtDiagnosticRow(
+            label = stringResource(R.string.bt_diag_device_address_label),
+            value = when {
+                bt == null || !bt.commandSuccess -> unchecked
+                bt.deviceAddressList.isNullOrBlank() -> empty
+                else -> bt.deviceAddressList
+            }
+        )
+        HorizontalDivider()
+
+        val carplayPropText = when {
+            bt == null || !bt.commandSuccess -> unchecked
+            bt.carplayStatusProp == "1" -> stringResource(R.string.bt_diag_carplay_status_active)
+            bt.carplayStatusProp == "0" -> stringResource(R.string.bt_diag_carplay_status_inactive)
+            bt.carplayStatusProp.isNullOrBlank() -> empty
+            else -> bt.carplayStatusProp
+        }
+        BtDiagnosticRow(
+            label = stringResource(R.string.bt_diag_carplay_status_label),
+            value = carplayPropText,
+            valueColor = if (bt?.isCarplayActive == true) {
+                MaterialTheme.colorScheme.primary
+            } else {
+                MaterialTheme.colorScheme.onSurface
+            }
+        )
+        HorizontalDivider()
+
+        val btStateText = if (bt == null || !bt.commandSuccess) {
+            unchecked
+        } else {
+            val adapterText = when (bt.btAdapterState) {
+                BtAdapterState.ON -> stringResource(R.string.bt_diag_bt_adapter_on)
+                BtAdapterState.OFF -> stringResource(R.string.bt_diag_bt_adapter_off)
+                BtAdapterState.TURNING_ON -> stringResource(R.string.bt_diag_bt_adapter_turning_on)
+                BtAdapterState.TURNING_OFF -> stringResource(R.string.bt_diag_bt_adapter_turning_off)
+                BtAdapterState.UNKNOWN -> stringResource(R.string.bt_diag_bt_adapter_unknown)
+            }
+            val connText = when (bt.btConnectionState) {
+                BtConnectionState.DISCONNECTED -> stringResource(R.string.bt_diag_bt_conn_disconnected)
+                BtConnectionState.CONNECTING -> stringResource(R.string.bt_diag_bt_conn_connecting)
+                BtConnectionState.CONNECTED -> stringResource(R.string.bt_diag_bt_conn_connected)
+                BtConnectionState.DISCONNECTING -> stringResource(R.string.bt_diag_bt_conn_disconnecting)
+                BtConnectionState.UNKNOWN -> stringResource(R.string.bt_diag_bt_conn_unknown)
+            }
+            val serviceText = stringResource(
+                if (bt.bluetoothServiceRunning) {
+                    R.string.bt_diag_service_running
+                } else {
+                    R.string.bt_diag_service_stopped
+                }
+            )
+            buildList {
+                add("$adapterText · $connText")
+                add(serviceText)
+                if (bt.isConnectingProp == true) {
+                    add(stringResource(R.string.bt_diag_is_connecting))
+                }
+            }.joinToString("\n")
+        }
+        BtDiagnosticRow(
+            label = stringResource(R.string.bt_diag_bt_state_label),
+            value = btStateText
+        )
+        HorizontalDivider()
+
+        val lastRun = state.btLastRun
+        val lastRunText = if (lastRun == null) {
+            stringResource(R.string.bt_diag_last_run_never)
+        } else {
+            val timeText = remember(lastRun.timestampMs) {
+                SimpleDateFormat("dd.MM HH:mm:ss", Locale.getDefault())
+                    .format(Date(lastRun.timestampMs))
+            }
+            val triggerText = stringResource(
+                when (lastRun.trigger) {
+                    BtFallbackTrigger.MANUAL -> R.string.bt_fallback_trigger_manual
+                    BtFallbackTrigger.BOOT -> R.string.bt_fallback_trigger_boot
+                    BtFallbackTrigger.WAKEUP -> R.string.bt_fallback_trigger_wakeup
+                    BtFallbackTrigger.CARPLAY_DISCONNECTED ->
+                        R.string.bt_fallback_trigger_carplay_disconnected
+                }
+            )
+            val outcomeText = stringResource(
+                when (lastRun.outcome) {
+                    BtFallbackOutcome.APPLIED -> R.string.bt_fallback_outcome_applied
+                    BtFallbackOutcome.SKIPPED_CARPLAY_ACTIVE ->
+                        R.string.bt_fallback_outcome_skipped_carplay
+                    BtFallbackOutcome.SKIPPED_BT_DISABLED ->
+                        R.string.bt_fallback_outcome_skipped_bt_disabled
+                    BtFallbackOutcome.SKIPPED_BT_ALREADY_CONNECTED ->
+                        R.string.bt_fallback_outcome_skipped_bt_connected
+                    BtFallbackOutcome.SKIPPED_NOT_BLOCKED ->
+                        R.string.bt_fallback_outcome_skipped_not_blocked
+                    BtFallbackOutcome.SKIPPED_LOOP_GUARD ->
+                        R.string.bt_fallback_outcome_skipped_loop_guard
+                    BtFallbackOutcome.FAILED -> R.string.bt_fallback_outcome_failed
+                }
+            )
+            buildList {
+                add("$timeText ($triggerText)")
+                add(outcomeText)
+                if (lastRun.detail.isNotBlank()) add(lastRun.detail)
+            }.joinToString("\n")
+        }
+        BtDiagnosticRow(
+            label = stringResource(R.string.bt_diag_last_run_label),
+            value = lastRunText,
+            valueColor = when (lastRun?.outcome) {
+                BtFallbackOutcome.APPLIED -> MaterialTheme.colorScheme.primary
+                BtFallbackOutcome.FAILED -> MaterialTheme.colorScheme.error
+                else -> MaterialTheme.colorScheme.onSurfaceVariant
+            }
+        )
+    }
+}
+
+@Composable
+private fun BtDiagnosticRow(
+    label: String,
+    value: String,
+    valueColor: Color = MaterialTheme.colorScheme.onSurface
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+        Text(
+            text = label,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            fontSize = 12.sp,
+            fontWeight = FontWeight.Medium
+        )
+        Text(
+            text = value,
+            color = valueColor,
+            fontSize = 14.sp
+        )
+    }
+}
+
+@Composable
 private fun ConnectionHintRow(
     hint: ProfileConnectionHint,
     onOpenConnection: () -> Unit
@@ -754,6 +1012,7 @@ private fun AutostartTab(
     onAutoApplyCodecFixChange: (Boolean) -> Unit,
     onAutoApplyDelayChange: (String) -> Unit,
     onAutoAotCompileChange: (Boolean) -> Unit,
+    onAutoBtFallbackChange: (Boolean) -> Unit,
     onOpenAccessibilitySettings: () -> Unit,
     onErrorNotificationsChange: (Boolean) -> Unit
 ) {
@@ -798,6 +1057,14 @@ private fun AutostartTab(
             checked = state.autoAotCompile,
             enabled = (state.adbEnabled || state.autoAotCompile) && !state.isBusy,
             onCheckedChange = onAutoAotCompileChange
+        )
+
+        SwitchSettingRow(
+            title = stringResource(R.string.auto_bt_fallback),
+            description = stringResource(R.string.auto_bt_fallback_description),
+            checked = state.autoBtFallback,
+            enabled = (state.adbEnabled || state.autoBtFallback) && !state.isBusy,
+            onCheckedChange = onAutoBtFallbackChange
         )
 
         Text(

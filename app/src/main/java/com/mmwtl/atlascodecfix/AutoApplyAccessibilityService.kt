@@ -12,6 +12,11 @@ class AutoApplyAccessibilityService : AccessibilityService() {
         super.onServiceConnected()
         lastWindowEventAtMs = SystemClock.elapsedRealtime()
         ensureAutoApplyScheduled("service connected")
+        val app = application as CodecFixApp
+        app.btFallbackMonitor.syncRegistration()
+        if (!BtFallbackScheduler.ensureBootScheduled(this)) {
+            Log.e(TAG, "Unable to schedule BT fallback: service connected")
+        }
     }
 
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {

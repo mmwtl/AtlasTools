@@ -65,6 +65,48 @@ class CodecFixPrefs(context: Context) {
     val autoWorkEnabled: Boolean
         get() = adbEnabled && (autoApplyCodecFix || autoAotCompile)
 
+    var autoBtFallback: Boolean
+        get() = prefs.getBoolean(KEY_AUTO_BT_FALLBACK, false)
+        set(value) = prefs.edit { putBoolean(KEY_AUTO_BT_FALLBACK, value) }
+
+    val autoBtFallbackEnabled: Boolean
+        get() = adbEnabled && autoBtFallback
+
+    internal var btFallbackRetryCount: Int
+        get() = prefs.getInt(KEY_BT_FALLBACK_RETRY_COUNT, 0).coerceAtLeast(0)
+        set(value) = prefs.edit { putInt(KEY_BT_FALLBACK_RETRY_COUNT, value.coerceAtLeast(0)) }
+
+    var btFallbackLastRun: BtFallbackLastRun?
+        get() {
+            val timestamp = prefs.getLong(KEY_BT_FALLBACK_LAST_TS, 0L)
+            val trigger = BtFallbackTrigger.fromWireName(
+                prefs.getString(KEY_BT_FALLBACK_LAST_TRIGGER, null)
+            )
+            val outcome = BtFallbackOutcome.fromWireName(
+                prefs.getString(KEY_BT_FALLBACK_LAST_OUTCOME, null)
+            )
+            if (timestamp <= 0L || trigger == null || outcome == null) return null
+            return BtFallbackLastRun(
+                timestampMs = timestamp,
+                trigger = trigger,
+                outcome = outcome,
+                detail = prefs.getString(KEY_BT_FALLBACK_LAST_DETAIL, null).orEmpty()
+            )
+        }
+        set(value) = prefs.edit {
+            if (value == null) {
+                remove(KEY_BT_FALLBACK_LAST_TS)
+                remove(KEY_BT_FALLBACK_LAST_TRIGGER)
+                remove(KEY_BT_FALLBACK_LAST_OUTCOME)
+                remove(KEY_BT_FALLBACK_LAST_DETAIL)
+            } else {
+                putLong(KEY_BT_FALLBACK_LAST_TS, value.timestampMs)
+                putString(KEY_BT_FALLBACK_LAST_TRIGGER, value.trigger.wireName)
+                putString(KEY_BT_FALLBACK_LAST_OUTCOME, value.outcome.wireName)
+                putString(KEY_BT_FALLBACK_LAST_DETAIL, value.detail.take(MAX_BT_DETAIL_CHARS))
+            }
+        }
+
     var skipCompatibilityCheck: Boolean
         get() = prefs.getBoolean(KEY_SKIP_COMPATIBILITY_CHECK, false)
         set(value) = prefs.edit { putBoolean(KEY_SKIP_COMPATIBILITY_CHECK, value) }
@@ -111,6 +153,13 @@ class CodecFixPrefs(context: Context) {
         private const val KEY_ERROR_NOTIFICATIONS_ENABLED = "error_notifications_enabled"
         private const val KEY_SELECTED_VARIANT = "selected_variant"
         private const val KEY_AUTO_APPLY_RETRY_COUNT = "auto_apply_retry_count"
+        private const val KEY_AUTO_BT_FALLBACK = "auto_bt_fallback"
+        private const val KEY_BT_FALLBACK_RETRY_COUNT = "bt_fallback_retry_count"
+        private const val KEY_BT_FALLBACK_LAST_TS = "bt_fallback_last_ts"
+        private const val KEY_BT_FALLBACK_LAST_TRIGGER = "bt_fallback_last_trigger"
+        private const val KEY_BT_FALLBACK_LAST_OUTCOME = "bt_fallback_last_outcome"
+        private const val KEY_BT_FALLBACK_LAST_DETAIL = "bt_fallback_last_detail"
+        private const val MAX_BT_DETAIL_CHARS = 240
         private const val KEY_LAST_TELNET_HOST = "last_telnet_host"
         private const val KEY_LAST_TELNET_PORT = "last_telnet_port"
         private const val DEFAULT_ADB_HOST = "localhost"
